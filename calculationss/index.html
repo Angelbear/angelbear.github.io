@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Calculations</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .column-wrapper {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 20px;
+        }
+
+        .column {
+            break-inside: avoid;
+            margin-bottom: 20px;
+        }
+
+        .calculation {
+            padding: 5px;
+            text-align: center;
+            font-size: 20px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .missing-number {
+            display: inline-block;
+            width: 36px;
+            height: 36px;
+            border: 1px solid #000;
+            margin: 0 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Random Plus/Minus Calculations - A4 Size</h1>
+    <div class="column-wrapper">
+        <div class="column">
+            <div class="calculations" id="calculations1"></div>
+        </div>
+
+        <div class="column">
+            <div class="calculations" id="calculations2"></div>
+        </div>
+
+        <div class="column">
+            <div class="calculations" id="calculations3"></div>
+        </div>
+    </div>
+
+    <script>
+        function getRandomNumber(max) {
+            return Math.floor(Math.random() * max) + 1;
+        }
+
+        function generateCalculation() {
+            var num1 = getRandomNumber(100);
+            var num2 = getRandomNumber(100);
+            const isPlus = Math.random() < 0.5;
+            const operator = isPlus ? '+' : '-';
+            if (!isPlus && num1 < num2) {
+                const tmp = num1;
+                num1 = num2;
+                num2 = tmp;
+            }
+            const result = isPlus ? num1 + num2 : num1 - num2;
+
+            const missingNumberType = Math.floor(Math.random() * 3); // 0, 1, or 2
+            let missingNumber;
+
+            switch (missingNumberType) {
+                case 0: // Missing the first number
+                    missingNumber = `<div class="missing-number"></div> ${operator} ${num2} = ${result}`;
+                    break;
+                case 1: // Missing the second number
+                    missingNumber = `${num1} ${operator} <div class="missing-number"></div> = ${result}`;
+                    break;
+                case 2: // Missing the result
+                    missingNumber = `${num1} ${operator} ${num2} = <div class="missing-number">`;
+                    break;
+            }
+
+            return missingNumber;
+        }
+
+        function generateCalculations(columnNumber, numCalculations) {
+            const calculationsElement = document.getElementById(`calculations${columnNumber}`);
+            calculationsElement.innerHTML = '';
+
+            for (let i = 0; i < numCalculations; i++) {
+                const calculation = generateCalculation();
+                const calculationDiv = document.createElement('div');
+                calculationDiv.className = 'calculation';
+                calculationDiv.innerHTML = calculation;
+                calculationsElement.appendChild(calculationDiv);
+            }
+        }
+
+        // Generate random equations for each column on page load
+        window.addEventListener('load', function() {
+            generateCalculations(1, 18); // 5 equations in column 1
+            generateCalculations(2, 18); // 5 equations in column 2
+            generateCalculations(3, 18); // 5 equations in column 3
+        });
+    </script>
+</body>
+</html>
