@@ -137,3 +137,5 @@ Either modifying "pure" Istio or envoy configurations, `pilot-agent` will transl
 To get experience of modifying the spec part, we need to reference envoy's own [documentation site](https://www.envoyproxy.io/docs/envoy/latest/).
 
 From my personsal experience, envoy configuration is completely unfriendly to freshers of `Istio`. The biggest problem of it is that it contains too many terminalogies, covers a lot of topics, but lacks of examples. 
+
+Usually I would go to [envoyproxy github issues](https://github.com/envoyproxy/envoy/issues) and search for keywords. I could always get inspirations from the detailed configurations under the issue descriptions and replies.
