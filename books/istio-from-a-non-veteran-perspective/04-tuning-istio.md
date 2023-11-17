@@ -1,4 +1,4 @@
-#Tuning Istio
+# Tuning Istio
 
 Some of the new users of service mesh solutions including myself may think that network connections would be **improved** by just introducing the solution. This is wrong!
 
