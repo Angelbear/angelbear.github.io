@@ -13,14 +13,14 @@ istio-proxy, is like the wheels of the Pod, it hijacks all the network connectio
 
 Before you adapt Istio, your client Pod and server Pod would be connected via a single TCP connection, when you experienced some networking issues, you would either find some evidence from client side or server side. You only have 2 places to look at.
 
-<img src="./04-direct-connection.svg"
+<img src="./imgs/04-direct-connection.svg"
      alt="Istio Proxy"
      style="display: block; width: 70%; margin: auto; background: white;" />
 
 After you adapt Istio, both your client Pod and server Pod will be injected with an `istio-proxy` container, and this container hijacks all TCP connections in / out of the Pod.
 
 
-<img src="./04-istio-proxy.svg"
+<img src="./imgs/04-istio-proxy.svg"
      alt="Istio Proxy"
      style="display: block; width: 70%; margin: auto; background: white;" />
 
@@ -36,7 +36,7 @@ So instead of 1 TCP connection, you will have to establish 3 TCP connections to 
 One of the problems when met in early days with istio is the startup networking issue - in client Pod's main container, our application launches and tries to access the network immediately. 
 
 
-<img src="./04-istio-proxy-start.svg"
+<img src="./imgs/04-istio-proxy-start.svg"
      alt="Istio Proxy"
      style="display: block; width: 70%; margin: auto; background: white;" />
 
@@ -88,7 +88,7 @@ As a kubernetes user, you might already be familiar with the [termination in Pod
 
 Howeve, the problem is that by default, `istio-proxy` container will "immediately" falls in to the shutdown process, and draining all the connactions it currently holds. So all of a sudden, your main container loses all network access, either inbound or outbound. This makes your Pod's graceful shutdown not working anymore.
 
-<img src="./04-istio-proxy-terminate.svg"
+<img src="./imgs/04-istio-proxy-terminate.svg"
      alt="Istio Proxy"
      style="display: block; width: 70%; margin: auto; background: white;" />
 
@@ -124,7 +124,7 @@ In the above section, we've talked about the connectivity issues between client 
 
  What if the connnection issues happen between the source and destination Pod's `istio-proxy`?
 
-<img src="./04-istio-proxy-xDS.svg"
+<img src="./imgs/04-istio-proxy-xDS.svg"
      alt="Istio Proxy"
      style="display: block; width: 70%; margin: auto; background: white;" />
 
@@ -166,7 +166,7 @@ The key field in the error log is the upstream host `10.10.10.10:80`, which is t
 
 We tried to back search the original Pod's information of those 503 request logs, and we found those IPs are mostly from already terminated Pods.
 
-<img src="./04-phantom-pod.svg"
+<img src="./imgs/04-phantom-pod.svg"
      alt="Istio Proxy"
      style="display: block; width: 70%; margin: auto; background: white;" />
 
