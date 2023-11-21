@@ -1,0 +1,626 @@
+<!doctype html>
+<!--
+  Minimal Mistakes Jekyll Theme 4.24.0 by Michael Rose
+  Copyright 2013-2020 Michael Rose - mademistakes.com | @mmistakes
+  Free for personal and commercial use under the MIT license
+  https://github.com/mmistakes/minimal-mistakes/blob/master/LICENSE
+-->
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8">
+
+<!-- begin _includes/seo.html --><title>Istio Vs Envoy - Engineering Blog Posts</title>
+<meta name="description" content="If you looked at the documentation of Istio, this terminology envoy appears multiple ones. Also, there are some concepts like EnvoyFilter  that you might come up in the Istio documentation.">
+
+
+  <meta name="author" content="Yangyang Zhao">
+  
+  <meta property="article:author" content="Yangyang Zhao">
+  
+
+
+<meta property="og:type" content="article">
+<meta property="og:locale" content="en_US">
+<meta property="og:site_name" content="Engineering Blog Posts">
+<meta property="og:title" content="Istio Vs Envoy">
+<meta property="og:url" content="http://localhost:4000/blog/istio/2023/11/20/Istio-Vs-Envoy.html">
+
+
+  <meta property="og:description" content="If you looked at the documentation of Istio, this terminology envoy appears multiple ones. Also, there are some concepts like EnvoyFilter  that you might come up in the Istio documentation.">
+
+
+
+
+
+
+
+  <meta property="article:published_time" content="2023-11-20T17:00:00+08:00">
+
+
+
+
+
+
+<link rel="canonical" href="http://localhost:4000/blog/istio/2023/11/20/Istio-Vs-Envoy.html">
+
+
+
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    
+      "@type": "Person",
+      "name": null,
+      "url": "http://localhost:4000/blog/"
+    
+  }
+</script>
+
+
+
+
+
+
+
+<!-- end _includes/seo.html -->
+
+
+
+  <link href="/blog/feed.xml" type="application/atom+xml" rel="alternate" title="Engineering Blog Posts Feed">
+
+
+<!-- https://t.co/dKP3o1e -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script>
+  document.documentElement.className = document.documentElement.className.replace(/\bno-js\b/g, '') + ' js ';
+</script>
+
+<!-- For all browsers -->
+<link rel="stylesheet" href="/blog/assets/css/main.css">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5/css/all.min.css"></noscript>
+
+
+
+    <!-- start custom head snippets -->
+
+<!-- insert favicons. use https://realfavicongenerator.net/ -->
+
+<!-- end custom head snippets -->
+
+  </head>
+
+  <body class="layout--single">
+    <nav class="skip-links">
+  <ul>
+    <li><a href="#site-nav" class="screen-reader-shortcut">Skip to primary navigation</a></li>
+    <li><a href="#main" class="screen-reader-shortcut">Skip to content</a></li>
+    <li><a href="#footer" class="screen-reader-shortcut">Skip to footer</a></li>
+  </ul>
+</nav>
+
+    <!--[if lt IE 9]>
+<div class="notice--danger align-center" style="margin: 0;">You are using an <strong>outdated</strong> browser. Please <a href="https://browsehappy.com/">upgrade your browser</a> to improve your experience.</div>
+<![endif]-->
+
+    
+
+<div class="masthead">
+  <div class="masthead__inner-wrap">
+    <div class="masthead__menu">
+      <nav id="site-nav" class="greedy-nav">
+        
+        <a class="site-title" href="/blog/">
+          Engineering Blog Posts
+          
+        </a>
+        <ul class="visible-links"><li class="masthead__menu-item">
+              <a href="/blog/istio/">Istio</a>
+            </li></ul>
+        
+        <button class="greedy-nav__toggle hidden" type="button">
+          <span class="visually-hidden">Toggle menu</span>
+          <div class="navicon"></div>
+        </button>
+        <ul class="hidden-links hidden"></ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+
+    <div class="initial-content">
+      
+
+
+
+<div id="main" role="main">
+  
+  <div class="sidebar sticky">
+  
+
+
+<div itemscope itemtype="https://schema.org/Person">
+
+  
+
+  <div class="author__content">
+    
+      <h3 class="author__name" itemprop="name">Yangyang Zhao</h3>
+    
+    
+      <div class="author__bio" itemprop="description">
+        <p>Senior Staff Site Reliability Engineer</p>
+
+      </div>
+    
+  </div>
+
+  <div class="author__urls-wrapper">
+    <button class="btn btn--inverse">Follow</button>
+    <ul class="author__urls social-icons">
+      
+
+      
+        
+          
+            <li><a href="mailto:yangyang.zhao.thu@gmail.com" rel="nofollow noopener noreferrer"><i class="fas fa-fw fa-envelope-square" aria-hidden="true"></i><span class="label">Email</span></a></li>
+          
+        
+          
+            <li><a href="https://thewhip.com" rel="nofollow noopener noreferrer"><i class="fas fa-fw fa-link" aria-hidden="true"></i><span class="label">Website</span></a></li>
+          
+        
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      <!--
+  <li>
+    <a href="http://link-to-whatever-social-network.com/user/" itemprop="sameAs" rel="nofollow noopener noreferrer">
+      <i class="fas fa-fw" aria-hidden="true"></i> Custom Social Profile Link
+    </a>
+  </li>
+-->
+    </ul>
+  </div>
+</div>
+
+  
+  </div>
+
+
+
+  <article class="page" itemscope itemtype="https://schema.org/CreativeWork">
+    <meta itemprop="headline" content="Istio Vs Envoy">
+    <meta itemprop="description" content="If you looked at the documentation of Istio, this terminology envoy appears multiple ones. Also, there are some concepts like EnvoyFilter  that you might come up in the Istio documentation.">
+    <meta itemprop="datePublished" content="2023-11-20T17:00:00+08:00">
+    
+
+    <div class="page__inner-wrap">
+      
+        <header>
+          <h1 id="page-title" class="page__title" itemprop="headline">Istio Vs Envoy
+</h1>
+          
+
+  <p class="page__meta">
+    
+
+    
+
+    
+      
+      
+
+      <span class="page__meta-readtime">
+        <i class="far fa-clock" aria-hidden="true"></i>
+        
+          2 minute read
+        
+      </span>
+    
+  </p>
+
+
+        </header>
+      
+
+      <section class="page__content" itemprop="text">
+        
+        <p>If you looked at the documentation of Istio, this terminology <code class="language-plaintext highlighter-rouge">envoy</code> appears multiple ones. Also, there are some concepts like <code class="language-plaintext highlighter-rouge">EnvoyFilter</code>  that you might come up in the Istio documentation.</p>
+
+<p>Assuming you’ve already had experience of instealling Istio, you may find there are two essential kubernetes components - <code class="language-plaintext highlighter-rouge">istiod</code> deployment and <code class="language-plaintext highlighter-rouge">istio-proxy</code> sidecar container. And in <code class="language-plaintext highlighter-rouge">istio-proxy</code> container you can find  there is this <code class="language-plaintext highlighter-rouge">envoy</code> process forked from <code class="language-plaintext highlighter-rouge">pilot-agent</code></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+istio-p+     1  0.0  0.1 745700 36476 ?        Ssl  Oct19   2:29 /usr/local/bin/pilot-agent proxy sidecar --domain &lt;app&gt;.svc.cluster.local --serviceCluster &lt;svc&gt;.&lt;ns&gt; --proxyLogLevel=warning --proxyComponentLogLevel=misc:error --log_out
+istio-p+    33  8.0  0.2 496548 95728 ?        Sl   Oct19 376:12 /usr/local/bin/envoy -c etc/istio/proxy/envoy-rev0.json --restart-epoch 0 --drain-time-s 45 --drain-strategy immediate --parent-shutdown-time-s 60 --service-cluster &lt;svc&gt;
+istio-p+    78  0.0  0.0  18660  3328 pts/0    Ss   04:57   0:00 bash
+istio-p+    95  0.0  0.0  34424  2712 pts/0    R+   04:58   0:00 ps aux
+</code></pre></div></div>
+<p>The relationship between <code class="language-plaintext highlighter-rouge">Istio</code> and <code class="language-plaintext highlighter-rouge">Envoy</code>, is like the relationship between <code class="language-plaintext highlighter-rouge">Kubernetes</code> and <code class="language-plaintext highlighter-rouge">Docker</code>. <a href="https://www.envoyproxy.io/">Envoy</a> is a standalone proxy tool designed for cloud native applications. If you take a look at <code class="language-plaintext highlighter-rouge">istio-proxy</code>’s source code - https://github.com/istio/proxy, it is depending on https://github.com/envoyproxy/envoy.</p>
+
+<p>Configuring <code class="language-plaintext highlighter-rouge">Istio</code> and <code class="language-plaintext highlighter-rouge">Envoy</code> is completely differnt, a typical Istio resource looks like</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">networking.istio.io/v1alpha3</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">VirtualService</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">reviews-route</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">hosts</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="s">reviews.prod.svc.cluster.local</span>
+  <span class="na">http</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s2">"</span><span class="s">reviews-v2-routes"</span>
+    <span class="na">match</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">uri</span><span class="pi">:</span>
+        <span class="na">prefix</span><span class="pi">:</span> <span class="s2">"</span><span class="s">/wpcatalog"</span>
+    <span class="pi">-</span> <span class="na">uri</span><span class="pi">:</span>
+        <span class="na">prefix</span><span class="pi">:</span> <span class="s2">"</span><span class="s">/consumercatalog"</span>
+    <span class="na">rewrite</span><span class="pi">:</span>
+      <span class="na">uri</span><span class="pi">:</span> <span class="s2">"</span><span class="s">/newcatalog"</span>
+    <span class="na">route</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">destination</span><span class="pi">:</span>
+        <span class="na">host</span><span class="pi">:</span> <span class="s">reviews.prod.svc.cluster.local</span>
+        <span class="na">subset</span><span class="pi">:</span> <span class="s">v2</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s2">"</span><span class="s">reviews-v1-route"</span>
+    <span class="na">route</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">destination</span><span class="pi">:</span>
+        <span class="na">host</span><span class="pi">:</span> <span class="s">reviews.prod.svc.cluster.local</span>
+        <span class="na">subset</span><span class="pi">:</span> <span class="s">v1</span>
+</code></pre></div></div>
+
+<p>While <code class="language-plaintext highlighter-rouge">envoy</code> configration looks like</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">static_resources</span><span class="pi">:</span>
+
+  <span class="na">listeners</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">listener_0</span>
+    <span class="na">address</span><span class="pi">:</span>
+      <span class="na">socket_address</span><span class="pi">:</span>
+        <span class="na">address</span><span class="pi">:</span> <span class="s">0.0.0.0</span>
+        <span class="na">port_value</span><span class="pi">:</span> <span class="m">10000</span>
+    <span class="na">filter_chains</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">filters</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">envoy.filters.network.http_connection_manager</span>
+        <span class="na">typed_config</span><span class="pi">:</span>
+          <span class="s2">"</span><span class="s">@type"</span><span class="pi">:</span> <span class="s">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+          <span class="na">stat_prefix</span><span class="pi">:</span> <span class="s">ingress_http</span>
+          <span class="na">access_log</span><span class="pi">:</span>
+          <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">envoy.access_loggers.stdout</span>
+            <span class="na">typed_config</span><span class="pi">:</span>
+              <span class="s2">"</span><span class="s">@type"</span><span class="pi">:</span> <span class="s">type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog</span>
+          <span class="na">http_filters</span><span class="pi">:</span>
+          <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">envoy.filters.http.router</span>
+            <span class="na">typed_config</span><span class="pi">:</span>
+              <span class="s2">"</span><span class="s">@type"</span><span class="pi">:</span> <span class="s">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+          <span class="na">route_config</span><span class="pi">:</span>
+            <span class="na">name</span><span class="pi">:</span> <span class="s">local_route</span>
+            <span class="na">virtual_hosts</span><span class="pi">:</span>
+            <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">local_service</span>
+              <span class="na">domains</span><span class="pi">:</span> <span class="pi">[</span><span class="s2">"</span><span class="s">*"</span><span class="pi">]</span>
+              <span class="na">routes</span><span class="pi">:</span>
+              <span class="pi">-</span> <span class="na">match</span><span class="pi">:</span>
+                  <span class="na">prefix</span><span class="pi">:</span> <span class="s2">"</span><span class="s">/"</span>
+                <span class="na">route</span><span class="pi">:</span>
+                  <span class="na">host_rewrite_literal</span><span class="pi">:</span> <span class="s">www.envoyproxy.io</span>
+                  <span class="na">cluster</span><span class="pi">:</span> <span class="s">service_envoyproxy_io</span>
+
+  <span class="na">clusters</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">service_envoyproxy_io</span>
+</code></pre></div></div>
+
+<p>For most of the Istio usages, you do not need to touch envoy related settings. Because 
+<a href="https://github.com/istio/istio/tree/master/pilot/cmd/pilot-agent">pilot_agent</a> does the job to <strong>translate your Istio configuration and other dynamic information into the envoy configurations</strong>, and it bootstraps the <code class="language-plaintext highlighter-rouge">envoy</code> process, while <code class="language-plaintext highlighter-rouge">envoy</code> actually does the job to handle all incoming / outgoing network traffic of the pod.</p>
+
+<p>Sometimes you still need to touch the <code class="language-plaintext highlighter-rouge">envoy</code> related configurations, if you use <a href="https://istio.io/latest/docs/reference/config/networking/envoy-filter/">Envoy Filters</a>.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">networking.istio.io/v1alpha3</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">EnvoyFilter</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">custom-protocol</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">istio-config</span> <span class="c1"># as defined in meshConfig resource.</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">configPatches</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">applyTo</span><span class="pi">:</span> <span class="s">NETWORK_FILTER</span>
+    <span class="na">match</span><span class="pi">:</span>
+      <span class="na">context</span><span class="pi">:</span> <span class="s">SIDECAR_OUTBOUND</span> <span class="c1"># will match outbound listeners in all sidecars</span>
+      <span class="na">listener</span><span class="pi">:</span>
+        <span class="na">portNumber</span><span class="pi">:</span> <span class="m">9307</span>
+        <span class="na">filterChain</span><span class="pi">:</span>
+          <span class="na">filter</span><span class="pi">:</span>
+            <span class="na">name</span><span class="pi">:</span> <span class="s2">"</span><span class="s">envoy.filters.network.tcp_proxy"</span>
+    <span class="na">patch</span><span class="pi">:</span>
+      <span class="na">operation</span><span class="pi">:</span> <span class="s">INSERT_BEFORE</span>
+      <span class="na">value</span><span class="pi">:</span>
+        <span class="c1"># This is the full filter config including the name and typed_config section.</span>
+        <span class="na">name</span><span class="pi">:</span> <span class="s2">"</span><span class="s">envoy.extensions.filters.network.mongo_proxy"</span>
+        <span class="na">typed_config</span><span class="pi">:</span>
+          <span class="s2">"</span><span class="s">@type"</span><span class="pi">:</span> <span class="s2">"</span><span class="s">type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy"</span>
+          <span class="s">...</span>
+  <span class="pi">-</span> <span class="na">applyTo</span><span class="pi">:</span> <span class="s">NETWORK_FILTER</span> <span class="c1"># http connection manager is a filter in Envoy</span>
+    <span class="na">match</span><span class="pi">:</span>
+      <span class="c1"># context omitted so that this applies to both sidecars and gateways</span>
+      <span class="na">listener</span><span class="pi">:</span>
+        <span class="na">filterChain</span><span class="pi">:</span>
+          <span class="na">filter</span><span class="pi">:</span>
+            <span class="na">name</span><span class="pi">:</span> <span class="s2">"</span><span class="s">envoy.filters.network.http_connection_manager"</span>
+    <span class="na">patch</span><span class="pi">:</span>
+      <span class="na">operation</span><span class="pi">:</span> <span class="s">MERGE</span>
+      <span class="na">value</span><span class="pi">:</span>
+        <span class="na">name</span><span class="pi">:</span> <span class="s2">"</span><span class="s">envoy.filters.network.http_connection_manager"</span>
+        <span class="na">typed_config</span><span class="pi">:</span>
+          <span class="s2">"</span><span class="s">@type"</span><span class="pi">:</span> <span class="s2">"</span><span class="s">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"</span>
+          <span class="na">common_http_protocol_options</span><span class="pi">:</span>
+            <span class="na">idle_timeout</span><span class="pi">:</span> <span class="s">30s</span>
+</code></pre></div></div>
+
+<p>Either modifying “pure” Istio or envoy configurations, <code class="language-plaintext highlighter-rouge">pilot-agent</code> will translate the new configuraion into the envoy configuraion file, and cause <code class="language-plaintext highlighter-rouge">envoy</code> to hot reload the new configurations.</p>
+
+<p>To get experience of modifying the spec part, we need to reference envoy’s own <a href="https://www.envoyproxy.io/docs/envoy/latest/">documentation site</a>.</p>
+
+<p>From my personsal experience, envoy configuration is completely unfriendly to freshers of <code class="language-plaintext highlighter-rouge">Istio</code>. The biggest problem of it is that it contains too many terminalogies, covers a lot of topics, but lacks of examples.</p>
+
+<p>Usually I would go to <a href="https://github.com/envoyproxy/envoy/issues">envoyproxy github issues</a> and search for keywords. I could always get inspirations from the detailed configurations under the issue descriptions and replies.</p>
+
+        
+      </section>
+
+      <footer class="page__meta">
+        
+        
+
+
+        
+
+  <p class="page__date"><strong><i class="fas fa-fw fa-calendar-alt" aria-hidden="true"></i> Updated:</strong> <time datetime="2023-11-20T17:00:00+08:00">November 20, 2023</time></p>
+
+
+      </footer>
+
+      <section class="page__share">
+  
+
+  <a href="https://twitter.com/intent/tweet?text=Istio+Vs+Envoy%20http%3A%2F%2Flocalhost%3A4000%2Fblog%2Fistio%2F2023%2F11%2F20%2FIstio-Vs-Envoy.html" class="btn btn--twitter" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="Share on Twitter"><i class="fab fa-fw fa-twitter" aria-hidden="true"></i><span> Twitter</span></a>
+
+  <a href="https://www.facebook.com/sharer/sharer.php?u=http%3A%2F%2Flocalhost%3A4000%2Fblog%2Fistio%2F2023%2F11%2F20%2FIstio-Vs-Envoy.html" class="btn btn--facebook" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="Share on Facebook"><i class="fab fa-fw fa-facebook" aria-hidden="true"></i><span> Facebook</span></a>
+
+  <a href="https://www.linkedin.com/shareArticle?mini=true&url=http%3A%2F%2Flocalhost%3A4000%2Fblog%2Fistio%2F2023%2F11%2F20%2FIstio-Vs-Envoy.html" class="btn btn--linkedin" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="Share on LinkedIn"><i class="fab fa-fw fa-linkedin" aria-hidden="true"></i><span> LinkedIn</span></a>
+</section>
+
+
+      
+  <nav class="pagination">
+    
+      <a href="/blog/istio/2023/11/20/Introduction.html" class="pagination--pager" title="Introduction
+">Previous</a>
+    
+    
+      <a href="/blog/istio/2023/11/20/L4-Vs-L7.html" class="pagination--pager" title="L4 Vs L7
+">Next</a>
+    
+  </nav>
+
+    </div>
+
+    
+  </article>
+
+  
+  
+    <div class="page__related">
+      <h4 class="page__related-title">You May Also Enjoy</h4>
+      <div class="grid__wrapper">
+        
+          
+
+
+
+<div class="grid__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title no_toc" itemprop="headline">
+      
+        <a href="/blog/istio/2023/11/20/Tuning-Istio.html" rel="permalink">Tuning Istio
+</a>
+      
+    </h2>
+    
+
+  <p class="page__meta">
+    
+
+    
+
+    
+      
+      
+
+      <span class="page__meta-readtime">
+        <i class="far fa-clock" aria-hidden="true"></i>
+        
+          18 minute read
+        
+      </span>
+    
+  </p>
+
+
+    <p class="archive__item-excerpt" itemprop="description">Some of the new users of service mesh solutions including myself may think that network connections would be improved by just introducing the solution. This ...</p>
+  </article>
+</div>
+
+        
+          
+
+
+
+<div class="grid__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title no_toc" itemprop="headline">
+      
+        <a href="/blog/istio/2023/11/20/L4-Vs-L7.html" rel="permalink">L4 Vs L7
+</a>
+      
+    </h2>
+    
+
+  <p class="page__meta">
+    
+
+    
+
+    
+      
+      
+
+      <span class="page__meta-readtime">
+        <i class="far fa-clock" aria-hidden="true"></i>
+        
+          12 minute read
+        
+      </span>
+    
+  </p>
+
+
+    <p class="archive__item-excerpt" itemprop="description">As many of the students who have studied computer science, networking is definitely a part that is very important, but easy to forget after graduation.
+
+</p>
+  </article>
+</div>
+
+        
+          
+
+
+
+<div class="grid__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title no_toc" itemprop="headline">
+      
+        <a href="/blog/istio/2023/11/20/Introduction.html" rel="permalink">Introduction
+</a>
+      
+    </h2>
+    
+
+  <p class="page__meta">
+    
+
+    
+
+    
+      
+      
+
+      <span class="page__meta-readtime">
+        <i class="far fa-clock" aria-hidden="true"></i>
+        
+          2 minute read
+        
+      </span>
+    
+  </p>
+
+
+    <p class="archive__item-excerpt" itemprop="description">I started to get in touch with Istio from 2020, when the Istio version was still around 1.6-ish. I was not the person who introduced Istio to the company, th...</p>
+  </article>
+</div>
+
+        
+      </div>
+    </div>
+  
+  
+</div>
+
+    </div>
+
+    
+
+    <div id="footer" class="page__footer">
+      <footer>
+        <!-- start custom footer snippets -->
+
+<!-- end custom footer snippets -->
+        <div class="page__footer-follow">
+  <ul class="social-icons">
+    
+
+    
+
+    
+      <li><a href="/blog/feed.xml"><i class="fas fa-fw fa-rss-square" aria-hidden="true"></i> Feed</a></li>
+    
+  </ul>
+</div>
+
+<div class="page__footer-copyright">&copy; 2023 Engineering Blog Posts. Powered by <a href="https://jekyllrb.com" rel="nofollow">Jekyll</a> &amp; <a href="https://mademistakes.com/work/minimal-mistakes-jekyll-theme/" rel="nofollow">Minimal Mistakes</a>.</div>
+
+      </footer>
+    </div>
+
+    
+  <script src="/blog/assets/js/main.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+  </body>
+</html>

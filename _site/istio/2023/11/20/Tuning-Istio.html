@@ -1,0 +1,865 @@
+<!doctype html>
+<!--
+  Minimal Mistakes Jekyll Theme 4.24.0 by Michael Rose
+  Copyright 2013-2020 Michael Rose - mademistakes.com | @mmistakes
+  Free for personal and commercial use under the MIT license
+  https://github.com/mmistakes/minimal-mistakes/blob/master/LICENSE
+-->
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8">
+
+<!-- begin _includes/seo.html --><title>Tuning Istio - Engineering Blog Posts</title>
+<meta name="description" content="Some of the new users of service mesh solutions including myself may think that network connections would be improved by just introducing the solution. This is wrong!">
+
+
+  <meta name="author" content="Yangyang Zhao">
+  
+  <meta property="article:author" content="Yangyang Zhao">
+  
+
+
+<meta property="og:type" content="article">
+<meta property="og:locale" content="en_US">
+<meta property="og:site_name" content="Engineering Blog Posts">
+<meta property="og:title" content="Tuning Istio">
+<meta property="og:url" content="http://localhost:4000/blog/istio/2023/11/20/Tuning-Istio.html">
+
+
+  <meta property="og:description" content="Some of the new users of service mesh solutions including myself may think that network connections would be improved by just introducing the solution. This is wrong!">
+
+
+
+
+
+
+
+  <meta property="article:published_time" content="2023-11-20T19:00:00+08:00">
+
+
+
+
+
+
+<link rel="canonical" href="http://localhost:4000/blog/istio/2023/11/20/Tuning-Istio.html">
+
+
+
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    
+      "@type": "Person",
+      "name": null,
+      "url": "http://localhost:4000/blog/"
+    
+  }
+</script>
+
+
+
+
+
+
+
+<!-- end _includes/seo.html -->
+
+
+
+  <link href="/blog/feed.xml" type="application/atom+xml" rel="alternate" title="Engineering Blog Posts Feed">
+
+
+<!-- https://t.co/dKP3o1e -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script>
+  document.documentElement.className = document.documentElement.className.replace(/\bno-js\b/g, '') + ' js ';
+</script>
+
+<!-- For all browsers -->
+<link rel="stylesheet" href="/blog/assets/css/main.css">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5/css/all.min.css"></noscript>
+
+
+
+    <!-- start custom head snippets -->
+
+<!-- insert favicons. use https://realfavicongenerator.net/ -->
+
+<!-- end custom head snippets -->
+
+  </head>
+
+  <body class="layout--single">
+    <nav class="skip-links">
+  <ul>
+    <li><a href="#site-nav" class="screen-reader-shortcut">Skip to primary navigation</a></li>
+    <li><a href="#main" class="screen-reader-shortcut">Skip to content</a></li>
+    <li><a href="#footer" class="screen-reader-shortcut">Skip to footer</a></li>
+  </ul>
+</nav>
+
+    <!--[if lt IE 9]>
+<div class="notice--danger align-center" style="margin: 0;">You are using an <strong>outdated</strong> browser. Please <a href="https://browsehappy.com/">upgrade your browser</a> to improve your experience.</div>
+<![endif]-->
+
+    
+
+<div class="masthead">
+  <div class="masthead__inner-wrap">
+    <div class="masthead__menu">
+      <nav id="site-nav" class="greedy-nav">
+        
+        <a class="site-title" href="/blog/">
+          Engineering Blog Posts
+          
+        </a>
+        <ul class="visible-links"><li class="masthead__menu-item">
+              <a href="/blog/istio/">Istio</a>
+            </li></ul>
+        
+        <button class="greedy-nav__toggle hidden" type="button">
+          <span class="visually-hidden">Toggle menu</span>
+          <div class="navicon"></div>
+        </button>
+        <ul class="hidden-links hidden"></ul>
+      </nav>
+    </div>
+  </div>
+</div>
+
+
+    <div class="initial-content">
+      
+
+
+
+<div id="main" role="main">
+  
+  <div class="sidebar sticky">
+  
+
+
+<div itemscope itemtype="https://schema.org/Person">
+
+  
+
+  <div class="author__content">
+    
+      <h3 class="author__name" itemprop="name">Yangyang Zhao</h3>
+    
+    
+      <div class="author__bio" itemprop="description">
+        <p>Senior Staff Site Reliability Engineer</p>
+
+      </div>
+    
+  </div>
+
+  <div class="author__urls-wrapper">
+    <button class="btn btn--inverse">Follow</button>
+    <ul class="author__urls social-icons">
+      
+
+      
+        
+          
+            <li><a href="mailto:yangyang.zhao.thu@gmail.com" rel="nofollow noopener noreferrer"><i class="fas fa-fw fa-envelope-square" aria-hidden="true"></i><span class="label">Email</span></a></li>
+          
+        
+          
+            <li><a href="https://thewhip.com" rel="nofollow noopener noreferrer"><i class="fas fa-fw fa-link" aria-hidden="true"></i><span class="label">Website</span></a></li>
+          
+        
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      <!--
+  <li>
+    <a href="http://link-to-whatever-social-network.com/user/" itemprop="sameAs" rel="nofollow noopener noreferrer">
+      <i class="fas fa-fw" aria-hidden="true"></i> Custom Social Profile Link
+    </a>
+  </li>
+-->
+    </ul>
+  </div>
+</div>
+
+  
+  </div>
+
+
+
+  <article class="page" itemscope itemtype="https://schema.org/CreativeWork">
+    <meta itemprop="headline" content="Tuning Istio">
+    <meta itemprop="description" content="Some of the new users of service mesh solutions including myself may think that network connections would be improved by just introducing the solution. This is wrong!">
+    <meta itemprop="datePublished" content="2023-11-20T19:00:00+08:00">
+    
+
+    <div class="page__inner-wrap">
+      
+        <header>
+          <h1 id="page-title" class="page__title" itemprop="headline">Tuning Istio
+</h1>
+          
+
+  <p class="page__meta">
+    
+
+    
+
+    
+      
+      
+
+      <span class="page__meta-readtime">
+        <i class="far fa-clock" aria-hidden="true"></i>
+        
+          18 minute read
+        
+      </span>
+    
+  </p>
+
+
+        </header>
+      
+
+      <section class="page__content" itemprop="text">
+        
+        <p>Some of the new users of service mesh solutions including myself may think that network connections would be <strong>improved</strong> by just introducing the solution. This is wrong!</p>
+
+<p>In fact, ever since introducing Istio, we’ve met more way networking issues with workloads enabled service mesh, compared to the workloads that doesn’t. There are many of the cases you might be supprised that you need to take care of once you start to use Istio.</p>
+
+<p>In this blog post, we will see how Istio makes things more complicated, and how we could tune the Istio setting to improve the networking connections.</p>
+
+<h2 id="istio-proxy">istio-proxy</h2>
+
+<p>istio-proxy, is like the wheels of the Pod, it hijacks all the network connections from/to the Pod after initialization.</p>
+
+<p>Before you adapt Istio, your client Pod and server Pod would be connected via a single TCP connection, when you experienced some networking issues, you would either find some evidence from client side or server side. You only have 2 places to look at.</p>
+
+<p><img src="http://localhost:4000/assets/imgs/04-direct-connection.svg" alt="Istio Proxy" style="display: block; width: 70%; margin: auto; background: white;" /></p>
+
+<p>After you adapt Istio, both your client Pod and server Pod will be injected with an <code class="language-plaintext highlighter-rouge">istio-proxy</code> container, and this container hijacks all TCP connections in / out of the Pod.</p>
+
+<p><img src="http://localhost:4000/assets/imgs/04-istio-proxy.svg" alt="Istio Proxy" style="display: block; width: 70%; margin: auto; background: white;" /></p>
+
+<p>So instead of 1 TCP connection, you will have to establish 3 TCP connections to “simulate” the original 1 TCP connection:</p>
+<ol>
+  <li>Between client Pod’ main container and its istio-proxy container</li>
+  <li>Between client Pod’s istio-proxy container and server Pod’s istio-proxy container</li>
+  <li>Between server Pod’s istio-proxy container and server Pod’s main container</li>
+</ol>
+
+<p>Supppose 1 TCP connection have 99.999% SLA, with istio enabled, you will have your 5 9’s SLA degraded to 4 9s. (99.999%<sup>3</sup> = 99.997%) natually. And what’s more, there are pitfalls around its life cycles.</p>
+
+<h3 id="startup-network-availability">Startup network availability</h3>
+
+<p>One of the problems when met in early days with istio is the startup networking issue - in client Pod’s main container, our application launches and tries to access the network immediately.</p>
+
+<p><img src="http://localhost:4000/assets/imgs/04-istio-proxy-start.svg" alt="Istio Proxy" style="display: block; width: 70%; margin: auto; background: white;" /></p>
+
+<p>While <code class="language-plaintext highlighter-rouge">istio-proxy</code> works as a “sidecar” container, it is launched with the main container together. As a matter of fact, there is no “main” or “sidecar” concept in Kubernetes (there is a <a href="https://github.com/kubernetes/enhancements/issues/753">proposal</a> in k8s but not procceeded yet.), both of them are containers. But if <code class="language-plaintext highlighter-rouge">istio-proxy</code> container is not ready, all the other containers in the Pod will not be able to access network. And if you main container happen to start network access earlier than <code class="language-plaintext highlighter-rouge">istio-proxy</code> container ready, your main container may fail to start.</p>
+
+<p>Most of the ppl didn’t realie this start up gap, the main container’s process is not able to access network in the begining, and it may retry and eventually succeeded after istio-proxy is ready; Or they exit with non-zero command and the main container get restarted, evetually it will also succeed after istio-proxy is ready.</p>
+
+<p>Sometimes your application start is expensive and may have side effect, so you do not want the main container to be restarted. To mitigate this issue, we’ve added wrapper script to the main container to monitor the <code class="language-plaintext highlighter-rouge">istio-proxy</code> container’s readiness (exposed in port 15000) before it really start the final command.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Wait for istio sidecar starts</span>
+<span class="nv">waited</span><span class="o">=</span>0
+<span class="k">while </span><span class="nb">true</span><span class="p">;</span> <span class="k">do
+   </span>curl <span class="nt">--max-time</span> 1 <span class="nt">--head</span> localhost:15000 <span class="o">&gt;&gt;</span> /dev/null <span class="o">&amp;&amp;</span> <span class="nb">break
+   </span><span class="nv">waited</span><span class="o">=</span><span class="k">$((</span>waited+1<span class="k">))</span>
+   <span class="nb">echo</span> <span class="s2">"Wait 1s for istio sidecar"</span>
+   <span class="nb">sleep </span>1
+<span class="k">done
+</span><span class="nb">echo</span> <span class="s2">"Istio sidecar is ready after </span><span class="k">${</span><span class="nv">waited</span><span class="k">}</span><span class="s2"> seconds wait"</span>
+
+<span class="c"># Start real process</span>
+</code></pre></div></div>
+
+<p>The Istio team is aware of this issue, therefore from Istio 1.8+, a proxy config can be enabled to hold application container to start until <code class="language-plaintext highlighter-rouge">istio-proxy</code> is ready.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">install.istio.io/v1alpha2</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">IstioOperator</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">meshConfig</span><span class="pi">:</span>
+    <span class="na">defaultConfig</span><span class="pi">:</span>
+      <span class="na">holdApplicationUntilProxyStarts</span><span class="pi">:</span> <span class="no">true</span>
+</code></pre></div></div>
+
+<p>Some prodution practise shows that even if <code class="language-plaintext highlighter-rouge">holdApplicationUntilProxyStarts</code> was introduced, the very first short time of the main container might still suffer from network issues, so if your app is very sensitive to network access in the startup phase, you may need to take care of the start process.</p>
+
+<h3 id="graceful-termination">Graceful Termination</h3>
+
+<p>Since <code class="language-plaintext highlighter-rouge">istio-proxy</code>  plays as a “proxy”, in order to make sure your main container have 100% of network connectivity, you need to make sure <code class="language-plaintext highlighter-rouge">istio-proxy</code>’s availability is longer than your main container’s network availibility. That is, before your container start network access, istio-proxy needs to be ready, and it must be ready after your container drops the network.</p>
+
+<p>Networking issues also happens during the termination of the Pod. When a Pod is to be terminated, Kubernetes send <code class="language-plaintext highlighter-rouge">SIGTERM</code> to each of the Pod’s container, including your main container, and <code class="language-plaintext highlighter-rouge">istio-proxy</code> container.</p>
+
+<p>As a kubernetes user, you might already be familiar with the <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination">termination in Pod lifecycle</a>, so your application already handles <code class="language-plaintext highlighter-rouge">SIGTERM</code> in a graceful way - it first blocks any new connetions, and then finishes the existing connections’ requests, finally shutdown itself. At the same time we also configure <code class="language-plaintext highlighter-rouge">spec.terminationGracePeriodSeconds</code> to give the main container’s process time for processing the exisiting requests.</p>
+
+<p>Howeve, the problem is that by default, <code class="language-plaintext highlighter-rouge">istio-proxy</code> container will “immediately” falls in to the shutdown process, and draining all the connactions it currently holds. So all of a sudden, your main container loses all network access, either inbound or outbound. This makes your Pod’s graceful shutdown not working anymore.</p>
+
+<p><img src="http://localhost:4000/assets/imgs/04-istio-proxy-terminate.svg" alt="Istio Proxy" style="display: block; width: 70%; margin: auto; background: white;" /></p>
+
+<p>We’ve experienced this problem that when HorizontalPodAutoscaler scales down the server Deployment, there will be a lot of 503 client errors complaining about connetion failure.</p>
+
+<p>In order to solve this problem, Istio provides configuration hold the <code class="language-plaintext highlighter-rouge">istio-proxy</code> for given duration before draining all the connections, similar to <code class="language-plaintext highlighter-rouge">holdApplicationUntilProxyStarts</code>, it can be configured in the global isito settings.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">install.istio.io/v1alpha2</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">IstioOperator</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">meshConfig</span><span class="pi">:</span>
+    <span class="na">defaultConfig</span><span class="pi">:</span>
+      <span class="na">terminationDrainDuration</span><span class="pi">:</span> <span class="s">30s</span>
+</code></pre></div></div>
+
+<p>Although, I recommend you to adapt this setting per deployment because every deployment may have different patterns of graceful and different time duration needed.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">metadata</span><span class="pi">:</span>
+    <span class="na">annotations</span><span class="pi">:</span>
+    <span class="s">proxy.istio.io/config</span><span class="pi">:</span> <span class="pi">|</span>
+        <span class="s">terminationDrainDuration: 30s</span>
+</code></pre></div></div>
+
+<p>The above annotation can be added in Pod spec so that it overrides’ the global settings, usually this should match the <code class="language-plaintext highlighter-rouge">spec.terminationGracePeriodSeconds</code> in the Pod spec.</p>
+
+<p>Updates: From Istio 1.12 <code class="language-plaintext highlighter-rouge">EXIT_ON_ZERO_ACTIVE_CONNECTIONS</code> flag was introduced to terminates proxy when number of active connections become zero during draining.</p>
+
+<h2 id="service-discovery">Service Discovery</h2>
+
+<p>In the above section, we’ve talked about the connectivity issues between client / server Pod main container and their <code class="language-plaintext highlighter-rouge">istio-proxy</code> container.</p>
+
+<p>What if the connnection issues happen between the source and destination Pod’s <code class="language-plaintext highlighter-rouge">istio-proxy</code>?</p>
+
+<p><img src="http://localhost:4000/assets/imgs/04-istio-proxy-xDS.svg" alt="Istio Proxy" style="display: block; width: 70%; margin: auto; background: white;" /></p>
+
+<p>Inter-pod communication is always complicated, either with or without Istio. The issue may happen in any layer of the network - kube-proxy, network cni, node issues, sometimes even physical issues in cloud providers.</p>
+
+<p>Since istio introduces extra ability to manage the connections for better traffic management, as the price, it has more possibilities of getting potential connectivity issues.</p>
+
+<p>A lot of times, application teams come and complain about connectivity issues. Basically there was intermediate connection failures between client and server deployments.</p>
+
+<p>A very common connectivity issues we’ve met since adapting Istio is <code class="language-plaintext highlighter-rouge">503 upstream_reset_before_response_started</code>, it’s printed from <code class="language-plaintext highlighter-rouge">istio-proxy</code> log in the client Pod when the pod tries to access the service pod via kubernetes service address.  The problem is happening from time to time, it’s not so critical but very annoying.</p>
+
+<p>Sometimes the issues became more frequent, and teams would ask SRE to look at the root cause. The dialogs have a very similar pattern:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>(Client Team): Our client applications shows 100+ 503s within last hour, there were spikes of timeout events from time to time.
+(Server Team): We've checked our server application's logs, we have 99.999% successful rate of service calls, and for 100% of the requests, we always return results (either good or error) within 10 seconds.
+(Client Team): We didn't touch any client code in last 2 weeks, so it's unlikely a client issue.
+(Server Team): This backend is not changed over 3 months, so it's unlikely a server issues as well.
+(SRE Team): We didn't touch any Istio settings recently, maybe the traffic was too much during the spike, let's increase the Pod number of the server pods.
+... (SRE Team increases the server Pods number) ...
+... Some time later ...
+(Client Team): The 503s was a bit better when we scaled up, but after a while, 503 comes again.
+(Server Team): We still confirmed 99.999% SLAs.
+(SRE Team): ...
+</code></pre></div></div>
+
+<p>To figure out the issue, we need to closely look into the istio-proxy access logs.</p>
+
+<p>The following is a failed service call log.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[2023-11-12T22:28:36.878Z] "POST /service HTTP/1.1" 503 UC 0 95 44456 - - "20f7f7e8-49f1-448c-a007-8806deec0414" "yourdomain.com" "10.10.10.10:80"
+</code></pre></div></div>
+
+<p>From the log we could figure out some detailed information around this call - when did it happen, http status, byte transferred, conneciton time, response time, request id, request domain, upstream hosts, etc.</p>
+
+<p>The key field in the error log is the upstream host <code class="language-plaintext highlighter-rouge">10.10.10.10:80</code>, which is the exact IP / Port this request goes to. And this IP is actually the service Pod’s IP address. We can use this IP address to back search the actual service Pod name, and we may be able to find out the Pod’s logs to troubleshoot.</p>
+
+<p>We tried to back search the original Pod’s information of those 503 request logs, and we found those IPs are mostly from already terminated Pods.</p>
+
+<p><img src="http://localhost:4000/assets/imgs/04-phantom-pod.svg" alt="Istio Proxy" style="display: block; width: 70%; margin: auto; background: white;" /></p>
+
+<p>The connections made to the terminated Pods will never be successfully established, but instead of immediatly fail the connection, it will hung there until client Pod’s istio-proxy exceed the connection timeout limit.</p>
+
+<p>Why would this phantom connection happen? Why client Pod would connect to a Pod that is already terminated? Why can’t the client Pod’s <code class="language-plaintext highlighter-rouge">istio-proxy</code> to try testing the pod liveness before making the connection?</p>
+
+<h3 id="xds">xDS</h3>
+
+<p>Let’s pick some memories about how load balancing was done with / without Istio in <a href="./03-L4-Vs-L7.md">L4 Vs L7</a>. We can reuse the example of nginx, how does a client’s Pod’s istio-proxy choose a Pod to connect to when the client’s main container needs to create a TCP connection to <code class="language-plaintext highlighter-rouge">nginx-service.namespace.svc.cluster.local</code>?</p>
+
+<p>The answer is - service Pods need to register / deregister themselves, and client pods need to update the service Pods’ registeration information.</p>
+
+<p>The design philosophy of istio is that it keeps most of the information needed by runtime in <code class="language-plaintext highlighter-rouge">istio-proxy</code>, and the information is got from centralized control plane - istiod.</p>
+
+<p>So you can understand like this: In <code class="language-plaintext highlighter-rouge">istio-proxy</code>’s memory, it contains a map that holds information like following. Basically we need to know which service have what Pods, and each Pod’s status. (healthy, unhealthy, etc)</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>serviceA  ------ serviceA-pod-1 (healthy)
+            |___ serviceA-pod-2 (unhealthy)
+            |___ serviceA-pod-3 (healthy)
+            ...
+
+serviceB ------- serviceB-pod-1 (healthy)
+            |___ serviceB-pod-2 (healthy)
+            |___ serviceB-pod-3 (unhealthy)
+            ...            
+...
+</code></pre></div></div>
+
+<p>When a Pod is created and injected with <code class="language-plaintext highlighter-rouge">istio-proxy</code>, the <code class="language-plaintext highlighter-rouge">istio-proxy</code> container gets this full service map from <code class="language-plaintext highlighter-rouge">istiod</code>.</p>
+
+<p>Of course, service Pods also changes on the fly. So when a service Pod is created / terminated / changed probe status, <code class="language-plaintext highlighter-rouge">istiod</code> will receive the information from either the service Pod’s <code class="language-plaintext highlighter-rouge">istio-proxy</code>, or it proactively monitor the service events from kubernetes, it will update the service map entries, and then eventually it will push these updates to all the <code class="language-plaintext highlighter-rouge">istio-proxy</code> containers on the kubernetes.</p>
+
+<p>The protocol of these service entry updates is called <strong>xDS</strong>. You might have seen tthishe word in Istio’s documentation once or twice, it appears more often in envoy’s documentation. (For relationship between Istio and Evnoy, please see the previous <a href="./02-Istio-Vs-Envoy.md">article</a>)</p>
+
+<p>The word <code class="language-plaintext highlighter-rouge">xDS</code> contains two parts - <code class="language-plaintext highlighter-rouge">x</code> is one of the <strong>C</strong>luster / <strong>L</strong>istener / <strong>E</strong>ndpoint / <strong>R</strong>oute’s initial and <code class="language-plaintext highlighter-rouge">DS</code> is short for Discovery Service. The process of <code class="language-plaintext highlighter-rouge">istiod</code> synchronizing these information to <code class="language-plaintext highlighter-rouge">istio-proxy</code> is called xDS push.</p>
+
+<p>xDS push doesn’t come for free, it takes time, especially if there are a lot of services in the kubernetes cluster, or a lot of Pods injected with <code class="language-plaintext highlighter-rouge">istio-proxy</code> container, or there are very frequent service updates happening.</p>
+
+<p>Say a server Pod is terminated, it takes <em>T</em> time before all client Pods’ <code class="language-plaintext highlighter-rouge">istio-proxy</code> updated their own service map to remove this Pod from the list. But during the <em>T</em> time, there is still possiblity the server Pod is picked by the client Pods for establishing TCP connection. Once it happend, it caused the issue we met above.</p>
+
+<p>Once we’ve reconized this issue, we could think of multiple ways to mitigate it.</p>
+
+<h4 id="reduce-xds-push-time">Reduce xDS push time</h4>
+
+<p>The very direct solution to mitigate the phantom connection is to reduce the <em>T</em> time. Istio exposes metrics for you to observe xDS push performance, and usually <code class="language-plaintext highlighter-rouge">pilot_proxy_convergence_time</code> is the key metric you should monitor.</p>
+
+<p>There are many different ways to reduce the push time.</p>
+
+<h4 id="increase-istiod-replicas">Increase istiod replicas</h4>
+<p>Since <code class="language-plaintext highlighter-rouge">istiod</code> plays the key role of collecting and pushing xDS messages from / to <code class="language-plaintext highlighter-rouge">istio-proxy</code>, more replicas would help to reduce the ops throughput of 1 istiod Pod, you should spend some time to adjust the istiod’s kubernetes Pod spec and HorizontalPodAutoscaling and make sure there is sufficient resource allocated to it.</p>
+
+<p>Following is the example of tuning istiod in IstioOperator.</p>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">install.istio.io/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">IstioOperator</span>
+<span class="na">spec</span><span class="pi">:</span>
+   <span class="na">components</span><span class="pi">:</span>
+    <span class="na">pilot</span><span class="pi">:</span>
+      <span class="na">k8s</span><span class="pi">:</span>
+        <span class="na">resources</span><span class="pi">:</span>
+          <span class="na">requests</span><span class="pi">:</span>
+            <span class="na">cpu</span><span class="pi">:</span> <span class="s">300m</span>
+            <span class="na">memory</span><span class="pi">:</span> <span class="s">2Gi</span>
+        <span class="na">hpaSpec</span><span class="pi">:</span>
+          <span class="na">minReplicas</span><span class="pi">:</span> <span class="m">8</span>
+          <span class="na">maxReplicas</span><span class="pi">:</span> <span class="m">64</span>
+          <span class="na">metrics</span><span class="pi">:</span>
+          <span class="pi">-</span> <span class="na">type</span><span class="pi">:</span> <span class="s">Resource</span>
+            <span class="na">resource</span><span class="pi">:</span>
+              <span class="na">name</span><span class="pi">:</span> <span class="s">cpu</span>
+              <span class="na">targetAverageUtilization</span><span class="pi">:</span> <span class="m">100</span>
+</code></pre></div></div>
+
+<h4 id="remove-unnessary-xds-push">Remove unnessary xDS push</h4>
+
+<p>We could increase istiod number to reduce the workload of each istiod, but the overal xDS push volume doesn’t reduce. If we can reduce the xDS push volume, that would be a more effective way to improve xDS push delay.</p>
+
+<p>In the above section we’ve described how client’s istio-proxy would memorize the service map with the xDS push process. With <code class="language-plaintext highlighter-rouge">istioctl</code> you would be able to inspect the mapping on the fly.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>~ istioctl proxy-config cluster client-pod-1.namespace
+SERVICE FQDN                                          PORT     SUBSET                               DIRECTION     TYPE             DESTINATION RULE
+                                                      80       -                                    inbound       ORIGINAL_DST
+BlackHoleCluster                                      -        -                                    -             STATIC
+InboundPassthroughClusterIpv4                         -        -                                    -             ORIGINAL_DST
+InboundPassthroughClusterIpv6                         -        -                                    -             ORIGINAL_DST
+PassthroughCluster                                    -        -                                    -             ORIGINAL_DST
+agent                                                 -        -                                    -             STATIC
+server.namespace.svc.cluster.local                    80       v1                                   outbound      EDS              
+server.namespace.svc.cluster.local                    80       v2                                   outbound      EDS      
+otherservice1.namespace.svc.cluster.local             80       -                                    outbound      EDS              
+otherservice2.namespace.svc.cluster.local             80       -                                    outbound      EDS   
+...
+prometheus_stats                                      -        -                                    -             STATIC
+</code></pre></div></div>
+
+<p>The above commane <code class="language-plaintext highlighter-rouge">proxy-config cluster</code> shows the CDS configuration, you could see that it contains some common services like <code class="language-plaintext highlighter-rouge">BlackHoleCluster</code>, <code class="language-plaintext highlighter-rouge">InboundPassthroughClusterIpv(4|6)</code>, <code class="language-plaintext highlighter-rouge">PassthroughCluster</code>, etc., it also contains the kubernetes service clusters, such as <code class="language-plaintext highlighter-rouge">server.namespace.svc.cluster.local</code> and others.</p>
+
+<p>If you inspect this in a real kubernetes cluster without proper tuning of Isito, you will find one of the biggest pitfall of Istio’s default setting - It will make <strong>every single Pod</strong> to receive the xDS push for <strong>every single kubernetes service</strong>!</p>
+
+<p>Ideally in above example, <code class="language-plaintext highlighter-rouge">client-pod-1</code> only need to receive xDS push for <code class="language-plaintext highlighter-rouge">server.namespace.svc.cluster.local</code>, but it ended up receiving xDS push for all other services in the kubernetes cluster, so it is with all the other Pods injected with <code class="language-plaintext highlighter-rouge">istio-proxy</code> in the kuberentes cluster. So the xDS push volume grows bigger and bigger with more Pods and service count.</p>
+
+<p>What is the ideal situation is that every Pod only receives nessasary xDS push for the services that 1) it needs to connect to the service, 2) it needs to make use of the L7 proxy features.</p>
+
+<p>But if you just follow Istio official examples, they won’t tell you to tune this since xDS push won’t be a bottleneck for simple senarios. But it is definitely worth tuning if you have more than dozens of services and more than thounsands of Pods on the same kubernetes clusters.</p>
+
+<p>The key Istio component to tune this is <a href="https://istio.io/latest/docs/reference/config/networking/sidecar/">Sidecar</a>, this “Sidecar” is not the “sidarcar” container which is <code class="language-plaintext highlighter-rouge">istio-proxy</code>, but rather to control “who cares what”.</p>
+
+<p>For the very first step, I would highly recommend you to add a default <code class="language-plaintext highlighter-rouge">Sidecar</code> for every namespace you would like to enable istio injection.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">networking.istio.io/v1beta1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Sidecar</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">default</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">egress</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">hosts</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="s1">'</span><span class="s">~/*'</span>
+  <span class="na">outboundTrafficPolicy</span><span class="pi">:</span>
+    <span class="na">mode</span><span class="pi">:</span> <span class="s">ALLOW_ANY</span>
+</code></pre></div></div>
+
+<p>What does this do?</p>
+
+<ol>
+  <li>The <code class="language-plaintext highlighter-rouge">default</code> Sidecar without <code class="language-plaintext highlighter-rouge">workloadSelector</code> will be the fallback rule for all <code class="language-plaintext highlighter-rouge">istio-proxy</code> containers in this namespace Pods.</li>
+  <li>The <code class="language-plaintext highlighter-rouge">egress.hosts[0]</code> with value <code class="language-plaintext highlighter-rouge">~/*</code> means by default <code class="language-plaintext highlighter-rouge">istio-proxy</code> container will not receive any service xDS push from any namespace</li>
+  <li>The <code class="language-plaintext highlighter-rouge">outboundTrafficPolicy.mode</code> with value <code class="language-plaintext highlighter-rouge">ALLOW_ANY</code> means <code class="language-plaintext highlighter-rouge">istio-proxy</code> will delegate the traffic control back to <code class="language-plaintext highlighter-rouge">kube-proxy</code></li>
+</ol>
+
+<p>Simply by setting this up, we will reduce 99% of the xDS pushes, but it also means we loses the the L7 layer traffic management features provided by Istio, and the behavior rolled back to kubernetes default.</p>
+
+<p>We definitely still want the L7 layer traffic management between the client and server, so we could add additional Sidecar configuration to cover this case.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">networking.istio.io/v1beta1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Sidecar</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">client-sdc</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">egress</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">hosts</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="s">namespace/server.namespace.svc.cluster.local</span>
+  <span class="na">workloadSelector</span><span class="pi">:</span>
+    <span class="na">labels</span><span class="pi">:</span>
+      <span class="na">app</span><span class="pi">:</span> <span class="s">client</span>
+</code></pre></div></div>
+
+<p>The above configuration allows the <code class="language-plaintext highlighter-rouge">client</code> Pods to be registered with xDS push for <code class="language-plaintext highlighter-rouge">server.namespace.svc.cluster.local</code> service changes, and the traffic management is taken over by Istio.</p>
+
+<p>With the two types of Sidecar above, we’ve changed the “all in xDS” behavior to “selective xDS”, and from my testing on a real prodution kubernetes cluster, it reduces 80% of the xDS push and dramatically improved the istiod resource consumption and the xDS push time.</p>
+
+<h4 id="outlier-detection">Outlier detection</h4>
+
+<p>We can do a lot of efforts to reduce the xDS push time, however you could never reduce it to 0. After the optimization we’ve done in previous sections, we’ve reduced the push time to &lt; 100ms in p99. This is already great improvement, but 100ms is still relatively long compared to the QPS that our cliend Pod requesting server Pod, so whenever a server Pod is terminated, there are still 503 errors from client to server.</p>
+
+<p>When we take a look at the logs and try to find out all the failed requests during a period, we found very interesting patterns - The failed requests were distributed among different client Pods, and each Pod failed for no more than 5 times. It seems that the client Pod will passively retry for other hosts if it experience a certain number of connection failures to a specific server Pod.</p>
+
+<p>This is yet another advanced traffic management feature that provided by Istio, which is not covered in <a href="./03-L4-Vs-L7.md">L4 Vs L7</a>, called <strong>Outlier Detection</strong>.</p>
+
+<p>xDS push will make the server Pods status to be eventually synced to the client Pods, and outlier detection is an addition support - before xDS push arrive, if the client Pod already experienced X times connection error to the destination Pod, it will mark it an “outlier” locally and avoid using it for a while.</p>
+
+<p>Outlier detection is by default enabled, and default values can be found in the <a href="https://istio.io/latest/docs/reference/config/networking/destination-rule/#OutlierDetection">official documentation</a>.</p>
+
+<p>One “pitfall” of the default outlier detection is that, it will only mark a upstream Pod to be outliered after 5 consecutive 5xx errors, that’s matching what we’ve observed from the client logs. The problem is that under this case, we’d want the client Pod to immediately choose another Pod for the next fortune, instead of meeting 5 failures in a row.</p>
+
+<p>So we’ve made following adjustment to let this outlier detection to be more effective.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">networking.istio.io/v1alpha3</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">DestinationRule</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">host</span><span class="pi">:</span> <span class="s">server.namespace.svc.cluster.local</span>
+  <span class="na">trafficPolicy</span><span class="pi">:</span>
+    <span class="na">outlierDetection</span><span class="pi">:</span>
+      <span class="na">baseEjectionTime</span><span class="pi">:</span> <span class="s">10s</span>
+      <span class="na">consecutive5xxErrors</span><span class="pi">:</span> <span class="m">1</span>
+</code></pre></div></div>
+<p><code class="language-plaintext highlighter-rouge">consecutive5xxErrors</code> is configured to be 1, which is most aggressive to make the client Pod choose another Pod for service connection after 1 503 timeout events.</p>
+
+<p><code class="language-plaintext highlighter-rouge">baseEjectionTime</code> is the time that outlier status will initially last before client Pod retries the Pod again, it is configured to be 10 seconds, and most likely within  this time, xDS push will arrive and remove this Pod from xDS entries entirely.</p>
+
+<p>With the above setting, we’ve seen a client Pod will at most experiencing 503 once for a server Pod, and the timeout events reduced to 20% ~ 30% percent compared to before.</p>
+
+<p>The outlier detection has some very detailed and interesting settings, and I suggest you taking a look at the documenetation and fine tune it for your own use case.</p>
+
+<h4 id="retry-retry-and-retry">Retry, retry and retry</h4>
+
+<p>After tuning wthe outlier detection, we are actually pretty satisfied with the sucessful rate, but the 503s still exists, if we have 100 client pods, it might cause 100 timeouts when a server Pod is terminated.</p>
+
+<p>Could we aim for zero 503s?</p>
+
+<p>The answer is Yes.</p>
+
+<p><code class="language-plaintext highlighter-rouge">VirtualService</code> supports configuration of retries for HTTP routes. It allows you to configure how many times you want to retry, and under what conditions you want to retry, etc.</p>
+
+<p>Originally we’ve configured retries as following, to let it retry at most 3 times when encounting gateway error, connection failures, etc.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Source: houzz.c2-thrift.flip/templates/vs.yaml</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">VirtualService</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">nginx-service-vs</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">host</span><span class="pi">:</span> <span class="s">nginx-service.namespace.svc.cluster.local</span>
+  <span class="na">http</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">main</span>
+    <span class="na">route</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">destination</span><span class="pi">:</span>
+        <span class="na">host</span><span class="pi">:</span> <span class="s">nginx-service.namespace.svc.cluster.local</span>
+    <span class="na">retries</span><span class="pi">:</span>
+      <span class="na">attempts</span><span class="pi">:</span> <span class="m">3</span>
+      <span class="na">retryOn</span><span class="pi">:</span> <span class="s1">'</span><span class="s">gateway-error,connect-failure,refused-stream,reset,503'</span>
+</code></pre></div></div>
+
+<p>But from the results, it doesn’t work out well for the 503s to terminated Pods, and by carefully checking the documentation, we found this pitfall.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">spec</span><span class="pi">:</span>
+   <span class="na">http</span><span class="pi">:</span>
+     <span class="na">retries</span><span class="pi">:</span>
+       <span class="na">attempts</span><span class="pi">:</span> <span class="m">3</span>
+       <span class="na">retryOn</span><span class="pi">:</span> <span class="s1">'</span><span class="s">gateway-error,connect-failure,refused-stream,reset,503'</span>
+       <span class="na">retryRemoteLocalities</span><span class="pi">:</span> <span class="no">true</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">http.retries.retryRemoteLocalities</code> is a flag to configure whether the retry should be to another Pod, or the same Pod, and default value is <code class="language-plaintext highlighter-rouge">false</code>. The perfectly explains why it doesn’t work - the destination Pod is already terminated, it won’t succeed no matter how many times you retries the same Pod. Switch this value to <code class="language-plaintext highlighter-rouge">true</code> makes the retry to retry another Pod, and in most cases it would work, even if it’s very unlucky to connect to another terminated Pod, it have 3 attempts so it most likely to get through eventually.</p>
+
+<p>With this final tuning, we’ve successfully made 503 timeout issues from several hundreds per day to nearly 0! This is definitely better than prior to use Istio.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>In this blog post, we could see how we identify and tune the Istio step by step, and finally achieved “better” connection than without using Istio.</p>
+
+<p>Waiting for dependency, graceful shutdown, outlier detection, retries, these are not new concepts created by Istio, developers used to implement these logics themselves in their application code. Istio make the logic embed in the service mesh layer and make it completely transparent to application.</p>
+
+<p>Also, it is noticable that the advanced traffic management features (outlier, retry) only supports L7 layer protocols (HTTP, gRPC, etc), if you want your system to benefit from it, you would choose your application protocols wisely.</p>
+
+        
+      </section>
+
+      <footer class="page__meta">
+        
+        
+
+
+        
+
+  <p class="page__date"><strong><i class="fas fa-fw fa-calendar-alt" aria-hidden="true"></i> Updated:</strong> <time datetime="2023-11-20T19:00:00+08:00">November 20, 2023</time></p>
+
+
+      </footer>
+
+      <section class="page__share">
+  
+
+  <a href="https://twitter.com/intent/tweet?text=Tuning+Istio%20http%3A%2F%2Flocalhost%3A4000%2Fblog%2Fistio%2F2023%2F11%2F20%2FTuning-Istio.html" class="btn btn--twitter" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="Share on Twitter"><i class="fab fa-fw fa-twitter" aria-hidden="true"></i><span> Twitter</span></a>
+
+  <a href="https://www.facebook.com/sharer/sharer.php?u=http%3A%2F%2Flocalhost%3A4000%2Fblog%2Fistio%2F2023%2F11%2F20%2FTuning-Istio.html" class="btn btn--facebook" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="Share on Facebook"><i class="fab fa-fw fa-facebook" aria-hidden="true"></i><span> Facebook</span></a>
+
+  <a href="https://www.linkedin.com/shareArticle?mini=true&url=http%3A%2F%2Flocalhost%3A4000%2Fblog%2Fistio%2F2023%2F11%2F20%2FTuning-Istio.html" class="btn btn--linkedin" onclick="window.open(this.href, 'window', 'left=20,top=20,width=500,height=500,toolbar=1,resizable=0'); return false;" title="Share on LinkedIn"><i class="fab fa-fw fa-linkedin" aria-hidden="true"></i><span> LinkedIn</span></a>
+</section>
+
+
+      
+  <nav class="pagination">
+    
+      <a href="/blog/istio/2023/11/20/L4-Vs-L7.html" class="pagination--pager" title="L4 Vs L7
+">Previous</a>
+    
+    
+      <a href="#" class="pagination--pager disabled">Next</a>
+    
+  </nav>
+
+    </div>
+
+    
+  </article>
+
+  
+  
+    <div class="page__related">
+      <h4 class="page__related-title">You May Also Enjoy</h4>
+      <div class="grid__wrapper">
+        
+          
+
+
+
+<div class="grid__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title no_toc" itemprop="headline">
+      
+        <a href="/blog/istio/2023/11/20/L4-Vs-L7.html" rel="permalink">L4 Vs L7
+</a>
+      
+    </h2>
+    
+
+  <p class="page__meta">
+    
+
+    
+
+    
+      
+      
+
+      <span class="page__meta-readtime">
+        <i class="far fa-clock" aria-hidden="true"></i>
+        
+          12 minute read
+        
+      </span>
+    
+  </p>
+
+
+    <p class="archive__item-excerpt" itemprop="description">As many of the students who have studied computer science, networking is definitely a part that is very important, but easy to forget after graduation.
+
+</p>
+  </article>
+</div>
+
+        
+          
+
+
+
+<div class="grid__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title no_toc" itemprop="headline">
+      
+        <a href="/blog/istio/2023/11/20/Istio-Vs-Envoy.html" rel="permalink">Istio Vs Envoy
+</a>
+      
+    </h2>
+    
+
+  <p class="page__meta">
+    
+
+    
+
+    
+      
+      
+
+      <span class="page__meta-readtime">
+        <i class="far fa-clock" aria-hidden="true"></i>
+        
+          2 minute read
+        
+      </span>
+    
+  </p>
+
+
+    <p class="archive__item-excerpt" itemprop="description">If you looked at the documentation of Istio, this terminology envoy appears multiple ones. Also, there are some concepts like EnvoyFilter  that you might com...</p>
+  </article>
+</div>
+
+        
+          
+
+
+
+<div class="grid__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/CreativeWork">
+    
+    <h2 class="archive__item-title no_toc" itemprop="headline">
+      
+        <a href="/blog/istio/2023/11/20/Introduction.html" rel="permalink">Introduction
+</a>
+      
+    </h2>
+    
+
+  <p class="page__meta">
+    
+
+    
+
+    
+      
+      
+
+      <span class="page__meta-readtime">
+        <i class="far fa-clock" aria-hidden="true"></i>
+        
+          2 minute read
+        
+      </span>
+    
+  </p>
+
+
+    <p class="archive__item-excerpt" itemprop="description">I started to get in touch with Istio from 2020, when the Istio version was still around 1.6-ish. I was not the person who introduced Istio to the company, th...</p>
+  </article>
+</div>
+
+        
+      </div>
+    </div>
+  
+  
+</div>
+
+    </div>
+
+    
+
+    <div id="footer" class="page__footer">
+      <footer>
+        <!-- start custom footer snippets -->
+
+<!-- end custom footer snippets -->
+        <div class="page__footer-follow">
+  <ul class="social-icons">
+    
+
+    
+
+    
+      <li><a href="/blog/feed.xml"><i class="fas fa-fw fa-rss-square" aria-hidden="true"></i> Feed</a></li>
+    
+  </ul>
+</div>
+
+<div class="page__footer-copyright">&copy; 2023 Engineering Blog Posts. Powered by <a href="https://jekyllrb.com" rel="nofollow">Jekyll</a> &amp; <a href="https://mademistakes.com/work/minimal-mistakes-jekyll-theme/" rel="nofollow">Minimal Mistakes</a>.</div>
+
+      </footer>
+    </div>
+
+    
+  <script src="/blog/assets/js/main.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+  </body>
+</html>

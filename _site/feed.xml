@@ -1,0 +1,859 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="3.9.3">Jekyll</generator><link href="http://localhost:4000/blog/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/blog/" rel="alternate" type="text/html" /><updated>2023-11-21T11:59:54+08:00</updated><id>http://localhost:4000/blog/feed.xml</id><title type="html">Engineering Blog Posts</title><subtitle>Write an awesome description for your new site here. You can edit this line in _config.yml. It will appear in your document head meta (for Google search results) and in your feed.xml site description.</subtitle><entry><title type="html">Tuning Istio</title><link href="http://localhost:4000/blog/istio/2023/11/20/Tuning-Istio.html" rel="alternate" type="text/html" title="Tuning Istio" /><published>2023-11-20T19:00:00+08:00</published><updated>2023-11-20T19:00:00+08:00</updated><id>http://localhost:4000/blog/istio/2023/11/20/Tuning-Istio</id><content type="html" xml:base="http://localhost:4000/blog/istio/2023/11/20/Tuning-Istio.html">&lt;p&gt;Some of the new users of service mesh solutions including myself may think that network connections would be &lt;strong&gt;improved&lt;/strong&gt; by just introducing the solution. This is wrong!&lt;/p&gt;
+
+&lt;p&gt;In fact, ever since introducing Istio, we’ve met more way networking issues with workloads enabled service mesh, compared to the workloads that doesn’t. There are many of the cases you might be supprised that you need to take care of once you start to use Istio.&lt;/p&gt;
+
+&lt;p&gt;In this blog post, we will see how Istio makes things more complicated, and how we could tune the Istio setting to improve the networking connections.&lt;/p&gt;
+
+&lt;h2 id=&quot;istio-proxy&quot;&gt;istio-proxy&lt;/h2&gt;
+
+&lt;p&gt;istio-proxy, is like the wheels of the Pod, it hijacks all the network connections from/to the Pod after initialization.&lt;/p&gt;
+
+&lt;p&gt;Before you adapt Istio, your client Pod and server Pod would be connected via a single TCP connection, when you experienced some networking issues, you would either find some evidence from client side or server side. You only have 2 places to look at.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://localhost:4000/assets/imgs/04-direct-connection.svg&quot; alt=&quot;Istio Proxy&quot; style=&quot;display: block; width: 70%; margin: auto; background: white;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;After you adapt Istio, both your client Pod and server Pod will be injected with an &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container, and this container hijacks all TCP connections in / out of the Pod.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://localhost:4000/assets/imgs/04-istio-proxy.svg&quot; alt=&quot;Istio Proxy&quot; style=&quot;display: block; width: 70%; margin: auto; background: white;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;So instead of 1 TCP connection, you will have to establish 3 TCP connections to “simulate” the original 1 TCP connection:&lt;/p&gt;
+&lt;ol&gt;
+  &lt;li&gt;Between client Pod’ main container and its istio-proxy container&lt;/li&gt;
+  &lt;li&gt;Between client Pod’s istio-proxy container and server Pod’s istio-proxy container&lt;/li&gt;
+  &lt;li&gt;Between server Pod’s istio-proxy container and server Pod’s main container&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Supppose 1 TCP connection have 99.999% SLA, with istio enabled, you will have your 5 9’s SLA degraded to 4 9s. (99.999%&lt;sup&gt;3&lt;/sup&gt; = 99.997%) natually. And what’s more, there are pitfalls around its life cycles.&lt;/p&gt;
+
+&lt;h3 id=&quot;startup-network-availability&quot;&gt;Startup network availability&lt;/h3&gt;
+
+&lt;p&gt;One of the problems when met in early days with istio is the startup networking issue - in client Pod’s main container, our application launches and tries to access the network immediately.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://localhost:4000/assets/imgs/04-istio-proxy-start.svg&quot; alt=&quot;Istio Proxy&quot; style=&quot;display: block; width: 70%; margin: auto; background: white;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;While &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; works as a “sidecar” container, it is launched with the main container together. As a matter of fact, there is no “main” or “sidecar” concept in Kubernetes (there is a &lt;a href=&quot;https://github.com/kubernetes/enhancements/issues/753&quot;&gt;proposal&lt;/a&gt; in k8s but not procceeded yet.), both of them are containers. But if &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container is not ready, all the other containers in the Pod will not be able to access network. And if you main container happen to start network access earlier than &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container ready, your main container may fail to start.&lt;/p&gt;
+
+&lt;p&gt;Most of the ppl didn’t realie this start up gap, the main container’s process is not able to access network in the begining, and it may retry and eventually succeeded after istio-proxy is ready; Or they exit with non-zero command and the main container get restarted, evetually it will also succeed after istio-proxy is ready.&lt;/p&gt;
+
+&lt;p&gt;Sometimes your application start is expensive and may have side effect, so you do not want the main container to be restarted. To mitigate this issue, we’ve added wrapper script to the main container to monitor the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container’s readiness (exposed in port 15000) before it really start the final command.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c&quot;&gt;# Wait for istio sidecar starts&lt;/span&gt;
+&lt;span class=&quot;nv&quot;&gt;waited&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;0
+&lt;span class=&quot;k&quot;&gt;while &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;do
+   &lt;/span&gt;curl &lt;span class=&quot;nt&quot;&gt;--max-time&lt;/span&gt; 1 &lt;span class=&quot;nt&quot;&gt;--head&lt;/span&gt; localhost:15000 &lt;span class=&quot;o&quot;&gt;&amp;gt;&amp;gt;&lt;/span&gt; /dev/null &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;break
+   &lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;waited&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;$((&lt;/span&gt;waited+1&lt;span class=&quot;k&quot;&gt;))&lt;/span&gt;
+   &lt;span class=&quot;nb&quot;&gt;echo&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;Wait 1s for istio sidecar&quot;&lt;/span&gt;
+   &lt;span class=&quot;nb&quot;&gt;sleep &lt;/span&gt;1
+&lt;span class=&quot;k&quot;&gt;done
+&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;echo&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;Istio sidecar is ready after &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;${&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;waited&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt; seconds wait&quot;&lt;/span&gt;
+
+&lt;span class=&quot;c&quot;&gt;# Start real process&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The Istio team is aware of this issue, therefore from Istio 1.8+, a proxy config can be enabled to hold application container to start until &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; is ready.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;install.istio.io/v1alpha2&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;IstioOperator&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;meshConfig&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;defaultConfig&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;holdApplicationUntilProxyStarts&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;true&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Some prodution practise shows that even if &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;holdApplicationUntilProxyStarts&lt;/code&gt; was introduced, the very first short time of the main container might still suffer from network issues, so if your app is very sensitive to network access in the startup phase, you may need to take care of the start process.&lt;/p&gt;
+
+&lt;h3 id=&quot;graceful-termination&quot;&gt;Graceful Termination&lt;/h3&gt;
+
+&lt;p&gt;Since &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt;  plays as a “proxy”, in order to make sure your main container have 100% of network connectivity, you need to make sure &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt;’s availability is longer than your main container’s network availibility. That is, before your container start network access, istio-proxy needs to be ready, and it must be ready after your container drops the network.&lt;/p&gt;
+
+&lt;p&gt;Networking issues also happens during the termination of the Pod. When a Pod is to be terminated, Kubernetes send &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;SIGTERM&lt;/code&gt; to each of the Pod’s container, including your main container, and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container.&lt;/p&gt;
+
+&lt;p&gt;As a kubernetes user, you might already be familiar with the &lt;a href=&quot;https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination&quot;&gt;termination in Pod lifecycle&lt;/a&gt;, so your application already handles &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;SIGTERM&lt;/code&gt; in a graceful way - it first blocks any new connetions, and then finishes the existing connections’ requests, finally shutdown itself. At the same time we also configure &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;spec.terminationGracePeriodSeconds&lt;/code&gt; to give the main container’s process time for processing the exisiting requests.&lt;/p&gt;
+
+&lt;p&gt;Howeve, the problem is that by default, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container will “immediately” falls in to the shutdown process, and draining all the connactions it currently holds. So all of a sudden, your main container loses all network access, either inbound or outbound. This makes your Pod’s graceful shutdown not working anymore.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://localhost:4000/assets/imgs/04-istio-proxy-terminate.svg&quot; alt=&quot;Istio Proxy&quot; style=&quot;display: block; width: 70%; margin: auto; background: white;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;We’ve experienced this problem that when HorizontalPodAutoscaler scales down the server Deployment, there will be a lot of 503 client errors complaining about connetion failure.&lt;/p&gt;
+
+&lt;p&gt;In order to solve this problem, Istio provides configuration hold the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; for given duration before draining all the connections, similar to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;holdApplicationUntilProxyStarts&lt;/code&gt;, it can be configured in the global isito settings.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;install.istio.io/v1alpha2&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;IstioOperator&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;meshConfig&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;defaultConfig&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;terminationDrainDuration&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;30s&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Although, I recommend you to adapt this setting per deployment because every deployment may have different patterns of graceful and different time duration needed.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;annotations&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;s&quot;&gt;proxy.istio.io/config&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;pi&quot;&gt;|&lt;/span&gt;
+        &lt;span class=&quot;s&quot;&gt;terminationDrainDuration: 30s&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The above annotation can be added in Pod spec so that it overrides’ the global settings, usually this should match the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;spec.terminationGracePeriodSeconds&lt;/code&gt; in the Pod spec.&lt;/p&gt;
+
+&lt;p&gt;Updates: From Istio 1.12 &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;EXIT_ON_ZERO_ACTIVE_CONNECTIONS&lt;/code&gt; flag was introduced to terminates proxy when number of active connections become zero during draining.&lt;/p&gt;
+
+&lt;h2 id=&quot;service-discovery&quot;&gt;Service Discovery&lt;/h2&gt;
+
+&lt;p&gt;In the above section, we’ve talked about the connectivity issues between client / server Pod main container and their &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container.&lt;/p&gt;
+
+&lt;p&gt;What if the connnection issues happen between the source and destination Pod’s &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt;?&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://localhost:4000/assets/imgs/04-istio-proxy-xDS.svg&quot; alt=&quot;Istio Proxy&quot; style=&quot;display: block; width: 70%; margin: auto; background: white;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Inter-pod communication is always complicated, either with or without Istio. The issue may happen in any layer of the network - kube-proxy, network cni, node issues, sometimes even physical issues in cloud providers.&lt;/p&gt;
+
+&lt;p&gt;Since istio introduces extra ability to manage the connections for better traffic management, as the price, it has more possibilities of getting potential connectivity issues.&lt;/p&gt;
+
+&lt;p&gt;A lot of times, application teams come and complain about connectivity issues. Basically there was intermediate connection failures between client and server deployments.&lt;/p&gt;
+
+&lt;p&gt;A very common connectivity issues we’ve met since adapting Istio is &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;503 upstream_reset_before_response_started&lt;/code&gt;, it’s printed from &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; log in the client Pod when the pod tries to access the service pod via kubernetes service address.  The problem is happening from time to time, it’s not so critical but very annoying.&lt;/p&gt;
+
+&lt;p&gt;Sometimes the issues became more frequent, and teams would ask SRE to look at the root cause. The dialogs have a very similar pattern:&lt;/p&gt;
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;(Client Team): Our client applications shows 100+ 503s within last hour, there were spikes of timeout events from time to time.
+(Server Team): We&apos;ve checked our server application&apos;s logs, we have 99.999% successful rate of service calls, and for 100% of the requests, we always return results (either good or error) within 10 seconds.
+(Client Team): We didn&apos;t touch any client code in last 2 weeks, so it&apos;s unlikely a client issue.
+(Server Team): This backend is not changed over 3 months, so it&apos;s unlikely a server issues as well.
+(SRE Team): We didn&apos;t touch any Istio settings recently, maybe the traffic was too much during the spike, let&apos;s increase the Pod number of the server pods.
+... (SRE Team increases the server Pods number) ...
+... Some time later ...
+(Client Team): The 503s was a bit better when we scaled up, but after a while, 503 comes again.
+(Server Team): We still confirmed 99.999% SLAs.
+(SRE Team): ...
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;To figure out the issue, we need to closely look into the istio-proxy access logs.&lt;/p&gt;
+
+&lt;p&gt;The following is a failed service call log.&lt;/p&gt;
+
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;[2023-11-12T22:28:36.878Z] &quot;POST /service HTTP/1.1&quot; 503 UC 0 95 44456 - - &quot;20f7f7e8-49f1-448c-a007-8806deec0414&quot; &quot;yourdomain.com&quot; &quot;10.10.10.10:80&quot;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;From the log we could figure out some detailed information around this call - when did it happen, http status, byte transferred, conneciton time, response time, request id, request domain, upstream hosts, etc.&lt;/p&gt;
+
+&lt;p&gt;The key field in the error log is the upstream host &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;10.10.10.10:80&lt;/code&gt;, which is the exact IP / Port this request goes to. And this IP is actually the service Pod’s IP address. We can use this IP address to back search the actual service Pod name, and we may be able to find out the Pod’s logs to troubleshoot.&lt;/p&gt;
+
+&lt;p&gt;We tried to back search the original Pod’s information of those 503 request logs, and we found those IPs are mostly from already terminated Pods.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://localhost:4000/assets/imgs/04-phantom-pod.svg&quot; alt=&quot;Istio Proxy&quot; style=&quot;display: block; width: 70%; margin: auto; background: white;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The connections made to the terminated Pods will never be successfully established, but instead of immediatly fail the connection, it will hung there until client Pod’s istio-proxy exceed the connection timeout limit.&lt;/p&gt;
+
+&lt;p&gt;Why would this phantom connection happen? Why client Pod would connect to a Pod that is already terminated? Why can’t the client Pod’s &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; to try testing the pod liveness before making the connection?&lt;/p&gt;
+
+&lt;h3 id=&quot;xds&quot;&gt;xDS&lt;/h3&gt;
+
+&lt;p&gt;Let’s pick some memories about how load balancing was done with / without Istio in &lt;a href=&quot;./03-L4-Vs-L7.md&quot;&gt;L4 Vs L7&lt;/a&gt;. We can reuse the example of nginx, how does a client’s Pod’s istio-proxy choose a Pod to connect to when the client’s main container needs to create a TCP connection to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-service.namespace.svc.cluster.local&lt;/code&gt;?&lt;/p&gt;
+
+&lt;p&gt;The answer is - service Pods need to register / deregister themselves, and client pods need to update the service Pods’ registeration information.&lt;/p&gt;
+
+&lt;p&gt;The design philosophy of istio is that it keeps most of the information needed by runtime in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt;, and the information is got from centralized control plane - istiod.&lt;/p&gt;
+
+&lt;p&gt;So you can understand like this: In &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt;’s memory, it contains a map that holds information like following. Basically we need to know which service have what Pods, and each Pod’s status. (healthy, unhealthy, etc)&lt;/p&gt;
+
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;serviceA  ------ serviceA-pod-1 (healthy)
+            |___ serviceA-pod-2 (unhealthy)
+            |___ serviceA-pod-3 (healthy)
+            ...
+
+serviceB ------- serviceB-pod-1 (healthy)
+            |___ serviceB-pod-2 (healthy)
+            |___ serviceB-pod-3 (unhealthy)
+            ...            
+...
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;When a Pod is created and injected with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt;, the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container gets this full service map from &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istiod&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Of course, service Pods also changes on the fly. So when a service Pod is created / terminated / changed probe status, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istiod&lt;/code&gt; will receive the information from either the service Pod’s &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt;, or it proactively monitor the service events from kubernetes, it will update the service map entries, and then eventually it will push these updates to all the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; containers on the kubernetes.&lt;/p&gt;
+
+&lt;p&gt;The protocol of these service entry updates is called &lt;strong&gt;xDS&lt;/strong&gt;. You might have seen tthishe word in Istio’s documentation once or twice, it appears more often in envoy’s documentation. (For relationship between Istio and Evnoy, please see the previous &lt;a href=&quot;./02-Istio-Vs-Envoy.md&quot;&gt;article&lt;/a&gt;)&lt;/p&gt;
+
+&lt;p&gt;The word &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;xDS&lt;/code&gt; contains two parts - &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;x&lt;/code&gt; is one of the &lt;strong&gt;C&lt;/strong&gt;luster / &lt;strong&gt;L&lt;/strong&gt;istener / &lt;strong&gt;E&lt;/strong&gt;ndpoint / &lt;strong&gt;R&lt;/strong&gt;oute’s initial and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;DS&lt;/code&gt; is short for Discovery Service. The process of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istiod&lt;/code&gt; synchronizing these information to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; is called xDS push.&lt;/p&gt;
+
+&lt;p&gt;xDS push doesn’t come for free, it takes time, especially if there are a lot of services in the kubernetes cluster, or a lot of Pods injected with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container, or there are very frequent service updates happening.&lt;/p&gt;
+
+&lt;p&gt;Say a server Pod is terminated, it takes &lt;em&gt;T&lt;/em&gt; time before all client Pods’ &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; updated their own service map to remove this Pod from the list. But during the &lt;em&gt;T&lt;/em&gt; time, there is still possiblity the server Pod is picked by the client Pods for establishing TCP connection. Once it happend, it caused the issue we met above.&lt;/p&gt;
+
+&lt;p&gt;Once we’ve reconized this issue, we could think of multiple ways to mitigate it.&lt;/p&gt;
+
+&lt;h4 id=&quot;reduce-xds-push-time&quot;&gt;Reduce xDS push time&lt;/h4&gt;
+
+&lt;p&gt;The very direct solution to mitigate the phantom connection is to reduce the &lt;em&gt;T&lt;/em&gt; time. Istio exposes metrics for you to observe xDS push performance, and usually &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;pilot_proxy_convergence_time&lt;/code&gt; is the key metric you should monitor.&lt;/p&gt;
+
+&lt;p&gt;There are many different ways to reduce the push time.&lt;/p&gt;
+
+&lt;h4 id=&quot;increase-istiod-replicas&quot;&gt;Increase istiod replicas&lt;/h4&gt;
+&lt;p&gt;Since &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istiod&lt;/code&gt; plays the key role of collecting and pushing xDS messages from / to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt;, more replicas would help to reduce the ops throughput of 1 istiod Pod, you should spend some time to adjust the istiod’s kubernetes Pod spec and HorizontalPodAutoscaling and make sure there is sufficient resource allocated to it.&lt;/p&gt;
+
+&lt;p&gt;Following is the example of tuning istiod in IstioOperator.&lt;/p&gt;
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;install.istio.io/v1alpha1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;IstioOperator&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+   &lt;span class=&quot;na&quot;&gt;components&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;pilot&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;k8s&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;resources&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;requests&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;cpu&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;300m&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;memory&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;2Gi&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;hpaSpec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;minReplicas&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;8&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;maxReplicas&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;64&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;metrics&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;type&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;Resource&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;resource&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;cpu&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;targetAverageUtilization&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;100&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h4 id=&quot;remove-unnessary-xds-push&quot;&gt;Remove unnessary xDS push&lt;/h4&gt;
+
+&lt;p&gt;We could increase istiod number to reduce the workload of each istiod, but the overal xDS push volume doesn’t reduce. If we can reduce the xDS push volume, that would be a more effective way to improve xDS push delay.&lt;/p&gt;
+
+&lt;p&gt;In the above section we’ve described how client’s istio-proxy would memorize the service map with the xDS push process. With &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istioctl&lt;/code&gt; you would be able to inspect the mapping on the fly.&lt;/p&gt;
+
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;~ istioctl proxy-config cluster client-pod-1.namespace
+SERVICE FQDN                                          PORT     SUBSET                               DIRECTION     TYPE             DESTINATION RULE
+                                                      80       -                                    inbound       ORIGINAL_DST
+BlackHoleCluster                                      -        -                                    -             STATIC
+InboundPassthroughClusterIpv4                         -        -                                    -             ORIGINAL_DST
+InboundPassthroughClusterIpv6                         -        -                                    -             ORIGINAL_DST
+PassthroughCluster                                    -        -                                    -             ORIGINAL_DST
+agent                                                 -        -                                    -             STATIC
+server.namespace.svc.cluster.local                    80       v1                                   outbound      EDS              
+server.namespace.svc.cluster.local                    80       v2                                   outbound      EDS      
+otherservice1.namespace.svc.cluster.local             80       -                                    outbound      EDS              
+otherservice2.namespace.svc.cluster.local             80       -                                    outbound      EDS   
+...
+prometheus_stats                                      -        -                                    -             STATIC
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The above commane &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;proxy-config cluster&lt;/code&gt; shows the CDS configuration, you could see that it contains some common services like &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BlackHoleCluster&lt;/code&gt;, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;InboundPassthroughClusterIpv(4|6)&lt;/code&gt;, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;PassthroughCluster&lt;/code&gt;, etc., it also contains the kubernetes service clusters, such as &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;server.namespace.svc.cluster.local&lt;/code&gt; and others.&lt;/p&gt;
+
+&lt;p&gt;If you inspect this in a real kubernetes cluster without proper tuning of Isito, you will find one of the biggest pitfall of Istio’s default setting - It will make &lt;strong&gt;every single Pod&lt;/strong&gt; to receive the xDS push for &lt;strong&gt;every single kubernetes service&lt;/strong&gt;!&lt;/p&gt;
+
+&lt;p&gt;Ideally in above example, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;client-pod-1&lt;/code&gt; only need to receive xDS push for &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;server.namespace.svc.cluster.local&lt;/code&gt;, but it ended up receiving xDS push for all other services in the kubernetes cluster, so it is with all the other Pods injected with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; in the kuberentes cluster. So the xDS push volume grows bigger and bigger with more Pods and service count.&lt;/p&gt;
+
+&lt;p&gt;What is the ideal situation is that every Pod only receives nessasary xDS push for the services that 1) it needs to connect to the service, 2) it needs to make use of the L7 proxy features.&lt;/p&gt;
+
+&lt;p&gt;But if you just follow Istio official examples, they won’t tell you to tune this since xDS push won’t be a bottleneck for simple senarios. But it is definitely worth tuning if you have more than dozens of services and more than thounsands of Pods on the same kubernetes clusters.&lt;/p&gt;
+
+&lt;p&gt;The key Istio component to tune this is &lt;a href=&quot;https://istio.io/latest/docs/reference/config/networking/sidecar/&quot;&gt;Sidecar&lt;/a&gt;, this “Sidecar” is not the “sidarcar” container which is &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt;, but rather to control “who cares what”.&lt;/p&gt;
+
+&lt;p&gt;For the very first step, I would highly recommend you to add a default &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Sidecar&lt;/code&gt; for every namespace you would like to enable istio injection.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1beta1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;Sidecar&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;default&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;egress&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;hosts&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&apos;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;~/*&apos;&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;outboundTrafficPolicy&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;mode&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;ALLOW_ANY&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;What does this do?&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;The &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;default&lt;/code&gt; Sidecar without &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;workloadSelector&lt;/code&gt; will be the fallback rule for all &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; containers in this namespace Pods.&lt;/li&gt;
+  &lt;li&gt;The &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;egress.hosts[0]&lt;/code&gt; with value &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;~/*&lt;/code&gt; means by default &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container will not receive any service xDS push from any namespace&lt;/li&gt;
+  &lt;li&gt;The &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;outboundTrafficPolicy.mode&lt;/code&gt; with value &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ALLOW_ANY&lt;/code&gt; means &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; will delegate the traffic control back to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;kube-proxy&lt;/code&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Simply by setting this up, we will reduce 99% of the xDS pushes, but it also means we loses the the L7 layer traffic management features provided by Istio, and the behavior rolled back to kubernetes default.&lt;/p&gt;
+
+&lt;p&gt;We definitely still want the L7 layer traffic management between the client and server, so we could add additional Sidecar configuration to cover this case.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1beta1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;Sidecar&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;client-sdc&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;egress&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;hosts&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;namespace/server.namespace.svc.cluster.local&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;workloadSelector&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;labels&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;app&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;client&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The above configuration allows the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;client&lt;/code&gt; Pods to be registered with xDS push for &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;server.namespace.svc.cluster.local&lt;/code&gt; service changes, and the traffic management is taken over by Istio.&lt;/p&gt;
+
+&lt;p&gt;With the two types of Sidecar above, we’ve changed the “all in xDS” behavior to “selective xDS”, and from my testing on a real prodution kubernetes cluster, it reduces 80% of the xDS push and dramatically improved the istiod resource consumption and the xDS push time.&lt;/p&gt;
+
+&lt;h4 id=&quot;outlier-detection&quot;&gt;Outlier detection&lt;/h4&gt;
+
+&lt;p&gt;We can do a lot of efforts to reduce the xDS push time, however you could never reduce it to 0. After the optimization we’ve done in previous sections, we’ve reduced the push time to &amp;lt; 100ms in p99. This is already great improvement, but 100ms is still relatively long compared to the QPS that our cliend Pod requesting server Pod, so whenever a server Pod is terminated, there are still 503 errors from client to server.&lt;/p&gt;
+
+&lt;p&gt;When we take a look at the logs and try to find out all the failed requests during a period, we found very interesting patterns - The failed requests were distributed among different client Pods, and each Pod failed for no more than 5 times. It seems that the client Pod will passively retry for other hosts if it experience a certain number of connection failures to a specific server Pod.&lt;/p&gt;
+
+&lt;p&gt;This is yet another advanced traffic management feature that provided by Istio, which is not covered in &lt;a href=&quot;./03-L4-Vs-L7.md&quot;&gt;L4 Vs L7&lt;/a&gt;, called &lt;strong&gt;Outlier Detection&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;xDS push will make the server Pods status to be eventually synced to the client Pods, and outlier detection is an addition support - before xDS push arrive, if the client Pod already experienced X times connection error to the destination Pod, it will mark it an “outlier” locally and avoid using it for a while.&lt;/p&gt;
+
+&lt;p&gt;Outlier detection is by default enabled, and default values can be found in the &lt;a href=&quot;https://istio.io/latest/docs/reference/config/networking/destination-rule/#OutlierDetection&quot;&gt;official documentation&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;One “pitfall” of the default outlier detection is that, it will only mark a upstream Pod to be outliered after 5 consecutive 5xx errors, that’s matching what we’ve observed from the client logs. The problem is that under this case, we’d want the client Pod to immediately choose another Pod for the next fortune, instead of meeting 5 failures in a row.&lt;/p&gt;
+
+&lt;p&gt;So we’ve made following adjustment to let this outlier detection to be more effective.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;DestinationRule&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;server.namespace.svc.cluster.local&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;trafficPolicy&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;outlierDetection&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;baseEjectionTime&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;10s&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;consecutive5xxErrors&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;consecutive5xxErrors&lt;/code&gt; is configured to be 1, which is most aggressive to make the client Pod choose another Pod for service connection after 1 503 timeout events.&lt;/p&gt;
+
+&lt;p&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;baseEjectionTime&lt;/code&gt; is the time that outlier status will initially last before client Pod retries the Pod again, it is configured to be 10 seconds, and most likely within  this time, xDS push will arrive and remove this Pod from xDS entries entirely.&lt;/p&gt;
+
+&lt;p&gt;With the above setting, we’ve seen a client Pod will at most experiencing 503 once for a server Pod, and the timeout events reduced to 20% ~ 30% percent compared to before.&lt;/p&gt;
+
+&lt;p&gt;The outlier detection has some very detailed and interesting settings, and I suggest you taking a look at the documenetation and fine tune it for your own use case.&lt;/p&gt;
+
+&lt;h4 id=&quot;retry-retry-and-retry&quot;&gt;Retry, retry and retry&lt;/h4&gt;
+
+&lt;p&gt;After tuning wthe outlier detection, we are actually pretty satisfied with the sucessful rate, but the 503s still exists, if we have 100 client pods, it might cause 100 timeouts when a server Pod is terminated.&lt;/p&gt;
+
+&lt;p&gt;Could we aim for zero 503s?&lt;/p&gt;
+
+&lt;p&gt;The answer is Yes.&lt;/p&gt;
+
+&lt;p&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;VirtualService&lt;/code&gt; supports configuration of retries for HTTP routes. It allows you to configure how many times you want to retry, and under what conditions you want to retry, etc.&lt;/p&gt;
+
+&lt;p&gt;Originally we’ve configured retries as following, to let it retry at most 3 times when encounting gateway error, connection failures, etc.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;# Source: houzz.c2-thrift.flip/templates/vs.yaml&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;VirtualService&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service-vs&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service.namespace.svc.cluster.local&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;main&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;destination&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service.namespace.svc.cluster.local&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;retries&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;attempts&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;retryOn&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&apos;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;gateway-error,connect-failure,refused-stream,reset,503&apos;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;But from the results, it doesn’t work out well for the 503s to terminated Pods, and by carefully checking the documentation, we found this pitfall.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+   &lt;span class=&quot;na&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+     &lt;span class=&quot;na&quot;&gt;retries&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+       &lt;span class=&quot;na&quot;&gt;attempts&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;
+       &lt;span class=&quot;na&quot;&gt;retryOn&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;&apos;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;gateway-error,connect-failure,refused-stream,reset,503&apos;&lt;/span&gt;
+       &lt;span class=&quot;na&quot;&gt;retryRemoteLocalities&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;true&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;http.retries.retryRemoteLocalities&lt;/code&gt; is a flag to configure whether the retry should be to another Pod, or the same Pod, and default value is &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;false&lt;/code&gt;. The perfectly explains why it doesn’t work - the destination Pod is already terminated, it won’t succeed no matter how many times you retries the same Pod. Switch this value to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;true&lt;/code&gt; makes the retry to retry another Pod, and in most cases it would work, even if it’s very unlucky to connect to another terminated Pod, it have 3 attempts so it most likely to get through eventually.&lt;/p&gt;
+
+&lt;p&gt;With this final tuning, we’ve successfully made 503 timeout issues from several hundreds per day to nearly 0! This is definitely better than prior to use Istio.&lt;/p&gt;
+
+&lt;h2 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h2&gt;
+
+&lt;p&gt;In this blog post, we could see how we identify and tune the Istio step by step, and finally achieved “better” connection than without using Istio.&lt;/p&gt;
+
+&lt;p&gt;Waiting for dependency, graceful shutdown, outlier detection, retries, these are not new concepts created by Istio, developers used to implement these logics themselves in their application code. Istio make the logic embed in the service mesh layer and make it completely transparent to application.&lt;/p&gt;
+
+&lt;p&gt;Also, it is noticable that the advanced traffic management features (outlier, retry) only supports L7 layer protocols (HTTP, gRPC, etc), if you want your system to benefit from it, you would choose your application protocols wisely.&lt;/p&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">Some of the new users of service mesh solutions including myself may think that network connections would be improved by just introducing the solution. This is wrong!</summary></entry><entry><title type="html">L4 Vs L7</title><link href="http://localhost:4000/blog/istio/2023/11/20/L4-Vs-L7.html" rel="alternate" type="text/html" title="L4 Vs L7" /><published>2023-11-20T18:00:00+08:00</published><updated>2023-11-20T18:00:00+08:00</updated><id>http://localhost:4000/blog/istio/2023/11/20/L4-Vs-L7</id><content type="html" xml:base="http://localhost:4000/blog/istio/2023/11/20/L4-Vs-L7.html">&lt;p&gt;As many of the students who have studied computer science, networking is definitely a part that is very important, but easy to forget after graduation.&lt;/p&gt;
+
+&lt;p&gt;All the modern frameworks in different languages hide the details of networking from you, and you can use just 3 lines to make a HTTP call in Python.&lt;/p&gt;
+
+&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;requests&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;requests&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;print&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;text&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;You take for granted that this is the ability provided, and may never remember those terminologies like physical layer, TCP handshake, etc. (Unless one day you were asked the question &lt;a href=&quot;https://www.linkedin.com/pulse/what-happens-when-you-type-googlecom-your-browser-press-sule-bala/&quot;&gt;What happens when you type google.com in your browser and press Enter&lt;/a&gt;)&lt;/p&gt;
+
+&lt;p&gt;We are not going to cover that many details about networking in this article. But there is a key quesition that we should be able to answer, why do we introduce Istio for the first place?&lt;/p&gt;
+
+&lt;p&gt;Stories may vary for different organization, but I guess the main purpose of introducing Istio should have &lt;strong&gt;better&lt;/strong&gt; traffic management in Kubernetes. The word “better” was emphasized because it’s not that kubernetes can not do traffic management. Kubernetes does provide traffic management, and in most senarios it works fine so that you do not need a better solution.&lt;/p&gt;
+
+&lt;p&gt;What exactly is Traffic Management in Kubernetes? Simply speaking, to control how requests will be routed to Pods.&lt;/p&gt;
+
+&lt;p&gt;Let’s take a look at a simple example. We first create a kubernetes deployment of nginx,&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;apps/v1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;Deployment&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-deployment&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;replicas&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;selector&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;matchLabels&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;app&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;template&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;labels&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;app&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;containers&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;image&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx:latest&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;and create corresponding service for accessing the nginx http server.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;v1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;Service&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;selector&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;app&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;ports&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;protocol&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;TCP&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;port&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;80&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;targetPort&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;80&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;type&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;ClusterIP&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Three &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment&lt;/code&gt; pods will be created, and you try to test the nginx service by typing &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;curl http://nginx-service.namepace.svc.cluster.local&lt;/code&gt; in any pod on the same kubernetes cluster. It would output “It Works!” as the default nginx response.&lt;/p&gt;
+
+&lt;h2 id=&quot;traffic-management---load-balancing&quot;&gt;Traffic Management - Load balancing&lt;/h2&gt;
+
+&lt;p&gt;How did the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;curl&lt;/code&gt; commmand reached the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment&lt;/code&gt; pods? The &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;curl&lt;/code&gt; command uses HTTP protocol, and it needs to establish a TCP connection to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-service.namepace.svc.cluster.local&lt;/code&gt; with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;80&lt;/code&gt; port. Since there are three &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx&lt;/code&gt; Pods, how does kubernetes decide which Pod’s nginx to connect?&lt;/p&gt;
+
+&lt;p&gt;Let’s see how it is working without Istio.  As the native kubernetes service implementation, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;kube-proxy&lt;/code&gt; is responsible for the decision. Once &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-service&lt;/code&gt; is created, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;kube-proxy&lt;/code&gt; takes care of following things:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;It creates IP address for the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-service&lt;/code&gt; and persist the record to kube-dns / core-dns, so when curl tries to resolve &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-service.namepace.svc.cluster.local&lt;/code&gt; it will get an dedicated Service IP.&lt;/li&gt;
+  &lt;li&gt;Whenever a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx&lt;/code&gt; Pod is created / deleted, become ready / unready, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;kube-proxy&lt;/code&gt; needs to add / remove the Pod from / to available candidates for &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-service&lt;/code&gt;.&lt;/li&gt;
+  &lt;li&gt;Whenever a TCP connection is to be established to the service IP / port, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;kube-proxy&lt;/code&gt; needs to select one candidate from its internal maintained list.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;This is so-called “Load Balancing”. The load balancing strategy may varies in different kubernetes versions, in high level it will do sort of “round robin” to let each of the Pod to be able to receive connections with even possibility (at best effort).&lt;/p&gt;
+
+&lt;h3 id=&quot;l4-layer-load-balancing---kube-proxy&quot;&gt;L4 layer load balancing - kube-proxy&lt;/h3&gt;
+
+&lt;p&gt;The above process generally works well for most of the senarios. If you get 30 QPS requests to the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-service&lt;/code&gt;, theoritically it should have ~ 10 QPS requests to each of the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment&lt;/code&gt; Pod.&lt;/p&gt;
+
+&lt;p&gt;But in reality, you may find QPS is not evenly distributed in the 3 &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment&lt;/code&gt; Pod, in some extreme cases, 1 Pod may get 30 QPS requests while other 2 Pods don’t get traffic at all.&lt;/p&gt;
+
+&lt;p&gt;How does it happen?&lt;/p&gt;
+
+&lt;p&gt;HTTP Protocol relies on TCP connections, so 1 HTTP request means we need to have 1 TCP connection. But it’s not like every HTTP request has to create a new TCP connection. There is this “Keep Alive” mechanism that a client can establish 1 TCP connection and reuse it for multiple HTTP requests.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://localhost:4000/assets/imgs/03-http-imbalanced.svg&quot; alt=&quot;HTTP Imbalanced Trffic&quot; style=&quot;display: block; width: 75%; margin: auto; background: white;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The above graph can directly simulate the actual traffic from different clients to different nginx pods. Although the TCP connections are evenly distributed, but actual HTTP requests are not.&lt;/p&gt;
+
+&lt;p&gt;This is exactly the bottleneck of kubernete’s native traffic management - it only works at &lt;strong&gt;L4 (Transport) Layer&lt;/strong&gt;, while HTTP protocol is at &lt;strong&gt;L7 (Application) Layer&lt;/strong&gt;. Once TCP connections are established, kubernetes lose the control how the client will use the connection, such as protocol, frequency, etc.&lt;/p&gt;
+
+&lt;h3 id=&quot;l7-layer-load-balancing---istio&quot;&gt;L7 layer load balancing - Istio&lt;/h3&gt;
+
+&lt;p&gt;How things would be different if we adapt Istio?&lt;/p&gt;
+
+&lt;p&gt;If we adapted istio and enabled the proxy injection in both service and client pods, we will see that &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container will be injected into the pods. Every single TCP connections from and to the pod will be intercepted.&lt;/p&gt;
+
+&lt;p&gt;As described in &lt;a href=&quot;02-Istio-Vs-Envoy.md&quot;&gt;Istio VS Envoy&lt;/a&gt;, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; does the the real job to establish the TCP connections to both side.&lt;/p&gt;
+
+&lt;p&gt;Essentially &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; needs to do the same job as &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;kube-proxy&lt;/code&gt;, but it does not rely on &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;kube-proxy&lt;/code&gt;, instead it implemented its ownd mechanism to do the service dns resolve, maintain the active candidates of Pods, and do the choice of pod for TCP connection.&lt;/p&gt;
+
+&lt;p&gt;But &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; does a bit more than that, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; maintains the TCP connections to both sides, not not nessasarily a 1:1 mapping.&lt;/p&gt;
+
+&lt;p&gt;Look at the following graph as the example, client app tries to connect to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-service.namepace.svc.cluster.local&lt;/code&gt;, and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; established the TCP connection between itself and the client process. But on the other hand, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; would create (or reuse) 1 or more TCP connections between itself and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment&lt;/code&gt; Pods.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://localhost:4000/assets/imgs/03-http-balanced.svg&quot; alt=&quot;HTTP Imbalanced Trffic&quot; style=&quot;display: block; width: 70%; margin: auto; background: white;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Later on, when clint process tries to send GET http requests, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; would use some strategy to forward the requests to differnt TCP connections with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment&lt;/code&gt; Pods. As a result, even the client pods may request at different frequency, ideally we could still achieve average QPS load in each of the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment&lt;/code&gt; Pods.&lt;/p&gt;
+
+&lt;p&gt;This is so-called the &lt;strong&gt;L7 (Application) Layer&lt;/strong&gt; load balancing, and this is the ability we would want from the Istio service mesh solution.&lt;/p&gt;
+
+&lt;p&gt;Not all of types the requests can benefit from the traffic management. For example, if you have a service app serves as TCP server and use custom Protocol, istio can not do that much to help with the load balancing. HTTP Protocol can be managed in this way because it’s a “stateless” protocol, so &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; can route the requests from the same client to different destination.&lt;/p&gt;
+
+&lt;h3 id=&quot;load-balancing-tuning-with-istio&quot;&gt;Load balancing tuning with Istio&lt;/h3&gt;
+
+&lt;p&gt;Once we realized that istio has the ability to manage traffic in L7 layer, we probably wanted to tune it to satisfy our application’s characteristics.&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://istio.io/latest/docs/reference/config/networking/destination-rule/&quot;&gt;DestinationRule&lt;/a&gt; is the key setting to tune traffic loadbalancing in L7 layer. It offers varities of configurations for users from simple strategies to advanced ones.&lt;/p&gt;
+
+&lt;h4 id=&quot;simple-load-balancing&quot;&gt;Simple load balancing&lt;/h4&gt;
+&lt;p&gt;Most of the users would be satisified &lt;a href=&quot;https://istio.io/latest/docs/reference/config/networking/destination-rule/#LoadBalancerSettings-SimpleLB&quot;&gt;standard load balancing algorithms&lt;/a&gt; provided by Istio, that require no tuning.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;DestinationRule&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service-dr&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service.namespace.svc.cluster.local&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;trafficPolicy&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;loadBalancer&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;simple&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;ROUND_ROBIN&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;LEAST_REQUEST&lt;/code&gt; and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ROUND_ROBIN&lt;/code&gt; would be the most practical algorithms that you might want to adapt to make the requests evenly distributed in your workloads. 99% of the time it is enough to do so.&lt;/p&gt;
+
+&lt;h4 id=&quot;consistent-hash-load-balancing&quot;&gt;Consistent hash load balancing&lt;/h4&gt;
+
+&lt;p&gt;Sometimes, you may want the traffic with the same characteristics to go to the same Pod for some reasons. For example, you may have in memory cache that may speed up the subsequential requests from the same user, or you may support resume from break-point for the same file uploads, etc.&lt;/p&gt;
+
+&lt;p&gt;To satisfy the the requirement of traffic “stickness”, istio offers &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;consistentHash&lt;/code&gt; strategy to let you to configure to use some of the traffic’s information - header, cookie, ip, etc. as the source for calculating hash, any traffic hashed to the same bucket would go to the same destination pod. Following is a simple example to use a specific header for consistent hash.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;DestinationRule&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service-dr&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service.namespace.svc.cluster.local&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;trafficPolicy&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;loadBalancer&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;consistentHash&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;httpHeaderName&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;my-header&quot;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;Notice that: 1. &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;consistentHash&lt;/code&gt; is only best effort, it will be impacted by pods scale up / down. 2. After applying this strategy, you may experience traffic imbalance due to the nature of user traffic distribution. More settings can be referenced in &lt;a href=&quot;https://istio.io/latest/docs/reference/config/networking/destination-rule/#LoadBalancerSettings-ConsistentHashLB&quot;&gt;the official documentation&lt;/a&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;traffic-management---routing&quot;&gt;Traffic Management - Routing&lt;/h3&gt;
+
+&lt;p&gt;After checking out the above settings, you might be pretty amazed by Istio already. But these are not enough to make Istio a good service mesh solution.&lt;/p&gt;
+
+&lt;p&gt;One senario we leverage Istio for advanced traffic management is for release management.&lt;/p&gt;
+
+&lt;p&gt;To extend then nginx example in previous sections, now suppose we already have a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment&lt;/code&gt; deployment that is using nginx:3.24, and we would like to upgrade it to use nginx:3.25. How would you approach it?&lt;/p&gt;
+
+&lt;p&gt;The simpliest way is to just editing the original deployment’s pod spec, and switch the image from &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx:3.24&lt;/code&gt; to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx:3.25&lt;/code&gt;, once you’ve done the operation, kuernetes will automatically trigger a rollout restart of the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment&lt;/code&gt;, and old pods with 3.24 version will be terminated, and new pods with 3.25 version will be created.&lt;/p&gt;
+
+&lt;p&gt;This works for some non-essential applications which you are either very confident to do a direct rollout or you are tolerant to temporary service down time so that you can easily rollback by switch the image version back.&lt;/p&gt;
+
+&lt;p&gt;Sometimes your application is essential, and you definitely do want to do a phase rollout - you may want to test new version first with a small portion of traffic, and ramp up the traffic to new version higher, and eventually 100% to the new version if everything is good; Otherwise, you might want to ramp down the traffic to 0% to the new version, and 100% to the old version.&lt;/p&gt;
+
+&lt;p&gt;It is possible to achieve this without service mesh solutions, but not perfectly. Let’s say we could always create multiple deployments of our applications with different versions.&lt;/p&gt;
+
+&lt;p&gt;For example, we create a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment-v1&lt;/code&gt; deployment with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx:3.24&lt;/code&gt; image.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;apps/v1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;Deployment&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-deployment-v1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;replicas&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;selector&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;matchLabels&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;app&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx&lt;/span&gt;   
+      &lt;span class=&quot;na&quot;&gt;version&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;1&lt;/span&gt;  
+  &lt;span class=&quot;na&quot;&gt;template&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;labels&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;app&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;version&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;containers&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;image&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx:3.24&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;And we create another deployment &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment-v2&lt;/code&gt; with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx:3.25&lt;/code&gt; image.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;apps/v1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;Deployment&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-deployment-v2&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;replicas&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;selector&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;matchLabels&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;app&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;version&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;template&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;labels&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;app&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;version&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;containers&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;image&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx:3.25&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The two deployments have the same label &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;app: nginx-service&lt;/code&gt;, so the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-service&lt;/code&gt; Service will recogonize both deployment’s apps.&lt;/p&gt;
+
+&lt;p&gt;We first will let &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment-v2&lt;/code&gt; to have 0 replicas, therefore TCP connections to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-service.namepace.svc.cluster.local&lt;/code&gt; are all with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment-v1&lt;/code&gt; Pods. As we want to ramp up new version traffic, we could increase &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment-v2&lt;/code&gt; Pod replicas to 1, therefore there will be 3 &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment-v1&lt;/code&gt; pods and 1 &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nginx-deployment-v2&lt;/code&gt;, with the native kubernetes service load balancing, there is 25% possibility client Pods connecting to v2 pod and 75% possibility connecting to v1 pods. We could keep increaseing v2 pods replicas and reduce v2 pods replicas, until finally v1 pods scale down to 0, all traffic will go to v2 pods. If we find problems with v2 pods, we can revert the operation.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://localhost:4000/assets/imgs//03-http-imbalanced-route.svg&quot; alt=&quot;HTTP Imbalanced Trffic&quot; style=&quot;display: block; width: 59%; margin: auto; background: white;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;This process is just fine for normal release requrement, which you will have sort of the live / canary mechanism to test the new rollout. But this is not perfect because the granularity of the ramp up / down can not be precisely controlled.&lt;/p&gt;
+
+&lt;p&gt;First of all, we have 3 replicas of old pods, so even ramping up 1 new pod will cause ~25% connections connecting to the new Pod.&lt;/p&gt;
+
+&lt;p&gt;Secondly, due to the L4 layer load balancing limitation, even if we setup old / new pods to be 3 : 1, the actual HTTP request % may diverge due to some clients calling more / less frequently.&lt;/p&gt;
+
+&lt;p&gt;How could Istio manage the routing better?&lt;/p&gt;
+
+&lt;p&gt;Istio would allow we define different “subsets” of a service by adding name with label selectors in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;DestinationRule&lt;/code&gt; - Remember we used this resource in above sections for load balancing? It can also be used for categorizing the service pods.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;DestinationRule&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service-dr&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service.namespace.svc.cluster.local&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;subsets&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;v1&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;labels&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;version&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;v2&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;labels&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;version&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The above config setup 2 subsets of nginx-service, the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;v1&lt;/code&gt; subset containing nginx:3.24, and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;v2&lt;/code&gt; subset containing nginx:3.25.&lt;/p&gt;
+
+&lt;p&gt;After setting up DestinationRule, we setup a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;VirtualService&lt;/code&gt; resource to define the route behavior.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;VirtualService&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service-vs&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service.namespace.svc.cluster.local&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;destination&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;subset&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;v1&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;weight&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;99&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;destination&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;subset&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;v2&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;weight&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;We defined &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;http.route&lt;/code&gt; config in VirtualService and let 99% of the http requests goes to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;v1&lt;/code&gt; subset, and 1% of the traffic goes to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;v2&lt;/code&gt; subset.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://localhost:4000/assets/imgs/03-http-balanced-route.svg&quot; alt=&quot;HTTP Imbalanced Trffic&quot; style=&quot;display: block; width: 59%; margin: auto; background: white;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The client app’s &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; will based on the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;VirtualService&lt;/code&gt; setting, to control the traffic split behavior. For example, if a client app sends 100 requests, 99 requests would go to v1 pods, 1 request would go to v2 pods. So even we have 3 v1 pods, and 1 v2 pods, we could still achieve 1% traffic split safely.&lt;/p&gt;
+
+&lt;h3 id=&quot;advanced-traffic-route-rules&quot;&gt;Advanced traffic route rules&lt;/h3&gt;
+
+&lt;p&gt;We see how the combination of VirtualService and DestinationRule controls the traffic split to v1 / v2 nginx nicely, but this is not the only ability of it.&lt;/p&gt;
+
+&lt;p&gt;Sometimes you want to test certain endpoints with specfic subsets - for example you want a certain URL pattern goes to some pods.&lt;/p&gt;
+
+&lt;p&gt;It’s very straightforward in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;VirtualService&lt;/code&gt; config that you can add &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;match&lt;/code&gt; rules in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;http.route&lt;/code&gt;.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;VirtualService&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service-vs&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service.namespace.svc.cluster.local&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;match&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;uri&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;prefix&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;/v2&quot;&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;destination&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;subset&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;v2&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;destination&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;subset&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;v1&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The above config would make it possible that:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;curl http://nginx-service.namespace.svc.cluster.local/v2&lt;/code&gt; goes to v2 pods&lt;/li&gt;
+  &lt;li&gt;Other requests goes to v1 pods&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Another common senario is that, you have a public facing web service, and before rolling out the new version, you want test the new versions on your browser using same urls, but “normal” users still access the old version.&lt;/p&gt;
+
+&lt;p&gt;A simple way to let Istio to identify “test” traffic would be adding a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;debug=&lt;/code&gt; cookie, and the requests with the cookie set would go to the new version.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;VirtualService&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service-vs&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service.namespace.svc.cluster.local&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;match&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;headers&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;cookie&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;regex&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;^(.*?;)?\s*(debug=1)\s*(;.*)?$&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;destination&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;subset&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;v2&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;destination&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;nginx-service&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;The setup is still using &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;match&lt;/code&gt; rules, but instead of depending on &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;uri&lt;/code&gt; matching, to use &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;headers&lt;/code&gt; for matching. Cookie is 1 of the special header in HTTP protocol so it could be used.&lt;/p&gt;
+
+&lt;p&gt;A few more interesting rules can be found in &lt;a href=&quot;https://istio.io/latest/docs/reference/config/networking/virtual-service/#HTTPMatchRequest&quot;&gt;official documentation&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;traffic-management---more-to-explore&quot;&gt;Traffic Management - more to explore&lt;/h2&gt;
+
+&lt;p&gt;By reading until here, I hope you’ve realized that why Istio is a &lt;strong&gt;better&lt;/strong&gt; solution for traffic management - Its implementing L7 (Application) layer proxy is the key magic. Traffic management on the L4 (Transportation) layer have very limited flexibilities because it doesn’t have the higher layer’s information (Request, URL, Cookie, etc)&lt;/p&gt;
+
+&lt;p&gt;In this artical, we’ve checked a few example of Istio doing traffice management around load balancing and routing, but there are more things we could tweak with Istio, like retries, outlier detection, etc. We will touch these points in following articles.&lt;/p&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">As many of the students who have studied computer science, networking is definitely a part that is very important, but easy to forget after graduation.</summary></entry><entry><title type="html">Istio Vs Envoy</title><link href="http://localhost:4000/blog/istio/2023/11/20/Istio-Vs-Envoy.html" rel="alternate" type="text/html" title="Istio Vs Envoy" /><published>2023-11-20T17:00:00+08:00</published><updated>2023-11-20T17:00:00+08:00</updated><id>http://localhost:4000/blog/istio/2023/11/20/Istio-Vs-Envoy</id><content type="html" xml:base="http://localhost:4000/blog/istio/2023/11/20/Istio-Vs-Envoy.html">&lt;p&gt;If you looked at the documentation of Istio, this terminology &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; appears multiple ones. Also, there are some concepts like &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;EnvoyFilter&lt;/code&gt;  that you might come up in the Istio documentation.&lt;/p&gt;
+
+&lt;p&gt;Assuming you’ve already had experience of instealling Istio, you may find there are two essential kubernetes components - &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istiod&lt;/code&gt; deployment and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; sidecar container. And in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container you can find  there is this &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; process forked from &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;pilot-agent&lt;/code&gt;&lt;/p&gt;
+
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+istio-p+     1  0.0  0.1 745700 36476 ?        Ssl  Oct19   2:29 /usr/local/bin/pilot-agent proxy sidecar --domain &amp;lt;app&amp;gt;.svc.cluster.local --serviceCluster &amp;lt;svc&amp;gt;.&amp;lt;ns&amp;gt; --proxyLogLevel=warning --proxyComponentLogLevel=misc:error --log_out
+istio-p+    33  8.0  0.2 496548 95728 ?        Sl   Oct19 376:12 /usr/local/bin/envoy -c etc/istio/proxy/envoy-rev0.json --restart-epoch 0 --drain-time-s 45 --drain-strategy immediate --parent-shutdown-time-s 60 --service-cluster &amp;lt;svc&amp;gt;
+istio-p+    78  0.0  0.0  18660  3328 pts/0    Ss   04:57   0:00 bash
+istio-p+    95  0.0  0.0  34424  2712 pts/0    R+   04:58   0:00 ps aux
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;The relationship between &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Istio&lt;/code&gt; and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Envoy&lt;/code&gt;, is like the relationship between &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Kubernetes&lt;/code&gt; and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Docker&lt;/code&gt;. &lt;a href=&quot;https://www.envoyproxy.io/&quot;&gt;Envoy&lt;/a&gt; is a standalone proxy tool designed for cloud native applications. If you take a look at &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt;’s source code - https://github.com/istio/proxy, it is depending on https://github.com/envoyproxy/envoy.&lt;/p&gt;
+
+&lt;p&gt;Configuring &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Istio&lt;/code&gt; and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Envoy&lt;/code&gt; is completely differnt, a typical Istio resource looks like&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;VirtualService&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;reviews-route&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;hosts&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;reviews.prod.svc.cluster.local&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;reviews-v2-routes&quot;&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;match&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;uri&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;prefix&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;/wpcatalog&quot;&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;uri&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;prefix&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;/consumercatalog&quot;&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;rewrite&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;uri&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;/newcatalog&quot;&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;destination&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;reviews.prod.svc.cluster.local&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;subset&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;v2&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;reviews-v1-route&quot;&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;destination&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;host&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;reviews.prod.svc.cluster.local&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;subset&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;v1&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;While &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; configration looks like&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;static_resources&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+
+  &lt;span class=&quot;na&quot;&gt;listeners&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;listener_0&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;socket_address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;0.0.0.0&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;port_value&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;10000&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;filter_chains&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;filters&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;envoy.filters.network.http_connection_manager&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;typed_config&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@type&quot;&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;stat_prefix&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;ingress_http&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;access_log&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;envoy.access_loggers.stdout&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;typed_config&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+              &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@type&quot;&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;http_filters&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;envoy.filters.http.router&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;typed_config&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+              &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@type&quot;&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;type.googleapis.com/envoy.extensions.filters.http.router.v3.Router&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;route_config&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;local_route&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;virtual_hosts&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;local_service&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;domains&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;pi&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;*&quot;&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;]&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;routes&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+              &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;match&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                  &lt;span class=&quot;na&quot;&gt;prefix&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;/&quot;&lt;/span&gt;
+                &lt;span class=&quot;na&quot;&gt;route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                  &lt;span class=&quot;na&quot;&gt;host_rewrite_literal&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;www.envoyproxy.io&lt;/span&gt;
+                  &lt;span class=&quot;na&quot;&gt;cluster&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;service_envoyproxy_io&lt;/span&gt;
+
+  &lt;span class=&quot;na&quot;&gt;clusters&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;service_envoyproxy_io&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;For most of the Istio usages, you do not need to touch envoy related settings. Because 
+&lt;a href=&quot;https://github.com/istio/istio/tree/master/pilot/cmd/pilot-agent&quot;&gt;pilot_agent&lt;/a&gt; does the job to &lt;strong&gt;translate your Istio configuration and other dynamic information into the envoy configurations&lt;/strong&gt;, and it bootstraps the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; process, while &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; actually does the job to handle all incoming / outgoing network traffic of the pod.&lt;/p&gt;
+
+&lt;p&gt;Sometimes you still need to touch the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; related configurations, if you use &lt;a href=&quot;https://istio.io/latest/docs/reference/config/networking/envoy-filter/&quot;&gt;Envoy Filters&lt;/a&gt;.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;EnvoyFilter&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;custom-protocol&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;namespace&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;istio-config&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# as defined in meshConfig resource.&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;configPatches&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;applyTo&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;NETWORK_FILTER&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;match&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;context&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;SIDECAR_OUTBOUND&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# will match outbound listeners in all sidecars&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;listener&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;portNumber&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;9307&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;filterChain&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;filter&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;envoy.filters.network.tcp_proxy&quot;&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;patch&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;operation&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;INSERT_BEFORE&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;value&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;# This is the full filter config including the name and typed_config section.&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;envoy.extensions.filters.network.mongo_proxy&quot;&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;typed_config&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@type&quot;&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy&quot;&lt;/span&gt;
+          &lt;span class=&quot;s&quot;&gt;...&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;applyTo&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;NETWORK_FILTER&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;# http connection manager is a filter in Envoy&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;match&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;c1&quot;&gt;# context omitted so that this applies to both sidecars and gateways&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;listener&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;filterChain&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;filter&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;envoy.filters.network.http_connection_manager&quot;&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;patch&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;operation&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;MERGE&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;value&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;envoy.filters.network.http_connection_manager&quot;&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;typed_config&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@type&quot;&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager&quot;&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;common_http_protocol_options&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;idle_timeout&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;30s&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Either modifying “pure” Istio or envoy configurations, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;pilot-agent&lt;/code&gt; will translate the new configuraion into the envoy configuraion file, and cause &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; to hot reload the new configurations.&lt;/p&gt;
+
+&lt;p&gt;To get experience of modifying the spec part, we need to reference envoy’s own &lt;a href=&quot;https://www.envoyproxy.io/docs/envoy/latest/&quot;&gt;documentation site&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;From my personsal experience, envoy configuration is completely unfriendly to freshers of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Istio&lt;/code&gt;. The biggest problem of it is that it contains too many terminalogies, covers a lot of topics, but lacks of examples.&lt;/p&gt;
+
+&lt;p&gt;Usually I would go to &lt;a href=&quot;https://github.com/envoyproxy/envoy/issues&quot;&gt;envoyproxy github issues&lt;/a&gt; and search for keywords. I could always get inspirations from the detailed configurations under the issue descriptions and replies.&lt;/p&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">If you looked at the documentation of Istio, this terminology envoy appears multiple ones. Also, there are some concepts like EnvoyFilter that you might come up in the Istio documentation.</summary></entry><entry><title type="html">Introduction</title><link href="http://localhost:4000/blog/istio/2023/11/20/Introduction.html" rel="alternate" type="text/html" title="Introduction" /><published>2023-11-20T16:00:00+08:00</published><updated>2023-11-20T16:00:00+08:00</updated><id>http://localhost:4000/blog/istio/2023/11/20/Introduction</id><content type="html" xml:base="http://localhost:4000/blog/istio/2023/11/20/Introduction.html">&lt;p&gt;I started to get in touch with Istio from 2020, when the Istio version was still around 1.6-ish. I was not the person who introduced Istio to the company, there was another engineer who was also a newbie to Istio, spending some time studying it, then installed and created the initial setup of istio eco system, and the company started to use it.&lt;/p&gt;
+
+&lt;p&gt;Unfortunately, not long after it was introduced, the guy who introduced Istio to the company resigned. He was the person who had the best knowledge of Istio by then (yet can not say he was a master of Istio). He tried his best to do the knowledge transfer before his last day, and I tried my best to digest them.&lt;/p&gt;
+
+&lt;p&gt;Obviously I wasn’t able to absort that much, and I started my 3 years fighting with it. Unlike many other open source networking tools, like Haproxy for instance, the concept &amp;amp; usage of istio is not straightforward. The debugging of istio related issues is hard - sometimes you can’t just reproduce the issues 100%, but it happens, even with 0.x% of the possibility, but not acceptable if you want to achieve 99.9% or 99.99% availaibility.&lt;/p&gt;
+
+&lt;p&gt;During 2020 ~ 2023, I met couple of issues that are related to istio, and I was able to spot and solve most the problems, but very ineffective. I spent days and days on verifying my hyposis, adjusting different settings, dug into the source code. Often the tryouts didn’t work, or even caused more problems. After solving the problems, the solutions seem to be very straightforward and I should have done it ever since adapting Istio.&lt;/p&gt;
+
+&lt;p&gt;Every time I experience the “aha moment”, I would doubt that “Am I smart enought to use Istio? Was it a wrong decision to adapt Istio in the company given the learning curve is so steep?”.&lt;/p&gt;
+
+&lt;p&gt;The fact is that to understand the Istio concepts, and master its usages, requires the person to have a good understanding of networking already. To most of the software engineers, it is hard, because networking was so well encapsulated so engineers barely need to write networking code in their daily life.&lt;/p&gt;
+
+&lt;p&gt;This book is a series of articles that describe the understanding of istio related concepts, from a non vereran’s perspective.&lt;/p&gt;
+
+&lt;p&gt;You don’t have to read this book if:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;You do not use Istio&lt;/li&gt;
+  &lt;li&gt;You are a veteran of Istio&lt;/li&gt;
+  &lt;li&gt;You want to learn Istio in the “right” way&lt;/li&gt;
+&lt;/ul&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">I started to get in touch with Istio from 2020, when the Istio version was still around 1.6-ish. I was not the person who introduced Istio to the company, there was another engineer who was also a newbie to Istio, spending some time studying it, then installed and created the initial setup of istio eco system, and the company started to use it.</summary></entry></feed>
