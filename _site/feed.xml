@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="3.9.3">Jekyll</generator><link href="http://localhost:4000/blog/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/blog/" rel="alternate" type="text/html" /><updated>2023-11-21T11:59:54+08:00</updated><id>http://localhost:4000/blog/feed.xml</id><title type="html">Engineering Blog Posts</title><subtitle>Write an awesome description for your new site here. You can edit this line in _config.yml. It will appear in your document head meta (for Google search results) and in your feed.xml site description.</subtitle><entry><title type="html">Tuning Istio</title><link href="http://localhost:4000/blog/istio/2023/11/20/Tuning-Istio.html" rel="alternate" type="text/html" title="Tuning Istio" /><published>2023-11-20T19:00:00+08:00</published><updated>2023-11-20T19:00:00+08:00</updated><id>http://localhost:4000/blog/istio/2023/11/20/Tuning-Istio</id><content type="html" xml:base="http://localhost:4000/blog/istio/2023/11/20/Tuning-Istio.html">&lt;p&gt;Some of the new users of service mesh solutions including myself may think that network connections would be &lt;strong&gt;improved&lt;/strong&gt; by just introducing the solution. This is wrong!&lt;/p&gt;
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="3.9.3">Jekyll</generator><link href="http://localhost:4000/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/" rel="alternate" type="text/html" /><updated>2023-11-21T16:52:15+08:00</updated><id>http://localhost:4000/feed.xml</id><title type="html">Yangyang’ Blog</title><subtitle>Write an awesome description for your new site here. You can edit this line in _config.yml. It will appear in your document head meta (for Google search results) and in your feed.xml site description.</subtitle><entry><title type="html">Tuning Istio</title><link href="http://localhost:4000/istio/2023/11/20/Tuning-Istio.html" rel="alternate" type="text/html" title="Tuning Istio" /><published>2023-11-20T19:00:00+08:00</published><updated>2023-11-20T19:00:00+08:00</updated><id>http://localhost:4000/istio/2023/11/20/Tuning-Istio</id><content type="html" xml:base="http://localhost:4000/istio/2023/11/20/Tuning-Istio.html">&lt;p&gt;Some of the new users of service mesh solutions including myself may think that network connections would be &lt;strong&gt;improved&lt;/strong&gt; by just introducing the solution. This is wrong!&lt;/p&gt;
 
 &lt;p&gt;In fact, ever since introducing Istio, we’ve met more way networking issues with workloads enabled service mesh, compared to the workloads that doesn’t. There are many of the cases you might be supprised that you need to take care of once you start to use Istio.&lt;/p&gt;
 
@@ -370,7 +370,7 @@ prometheus_stats                                      -        -                
 
 &lt;p&gt;Waiting for dependency, graceful shutdown, outlier detection, retries, these are not new concepts created by Istio, developers used to implement these logics themselves in their application code. Istio make the logic embed in the service mesh layer and make it completely transparent to application.&lt;/p&gt;
 
-&lt;p&gt;Also, it is noticable that the advanced traffic management features (outlier, retry) only supports L7 layer protocols (HTTP, gRPC, etc), if you want your system to benefit from it, you would choose your application protocols wisely.&lt;/p&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">Some of the new users of service mesh solutions including myself may think that network connections would be improved by just introducing the solution. This is wrong!</summary></entry><entry><title type="html">L4 Vs L7</title><link href="http://localhost:4000/blog/istio/2023/11/20/L4-Vs-L7.html" rel="alternate" type="text/html" title="L4 Vs L7" /><published>2023-11-20T18:00:00+08:00</published><updated>2023-11-20T18:00:00+08:00</updated><id>http://localhost:4000/blog/istio/2023/11/20/L4-Vs-L7</id><content type="html" xml:base="http://localhost:4000/blog/istio/2023/11/20/L4-Vs-L7.html">&lt;p&gt;As many of the students who have studied computer science, networking is definitely a part that is very important, but easy to forget after graduation.&lt;/p&gt;
+&lt;p&gt;Also, it is noticable that the advanced traffic management features (outlier, retry) only supports L7 layer protocols (HTTP, gRPC, etc), if you want your system to benefit from it, you would choose your application protocols wisely.&lt;/p&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">Some of the new users of service mesh solutions including myself may think that network connections would be improved by just introducing the solution. This is wrong!</summary></entry><entry><title type="html">L4 Vs L7</title><link href="http://localhost:4000/istio/2023/11/20/L4-Vs-L7.html" rel="alternate" type="text/html" title="L4 Vs L7" /><published>2023-11-20T18:00:00+08:00</published><updated>2023-11-20T18:00:00+08:00</updated><id>http://localhost:4000/istio/2023/11/20/L4-Vs-L7</id><content type="html" xml:base="http://localhost:4000/istio/2023/11/20/L4-Vs-L7.html">&lt;p&gt;As many of the students who have studied computer science, networking is definitely a part that is very important, but easy to forget after graduation.&lt;/p&gt;
 
 &lt;p&gt;All the modern frameworks in different languages hide the details of networking from you, and you can use just 3 lines to make a HTTP call in Python.&lt;/p&gt;
 
@@ -704,7 +704,7 @@ prometheus_stats                                      -        -                
 
 &lt;p&gt;By reading until here, I hope you’ve realized that why Istio is a &lt;strong&gt;better&lt;/strong&gt; solution for traffic management - Its implementing L7 (Application) layer proxy is the key magic. Traffic management on the L4 (Transportation) layer have very limited flexibilities because it doesn’t have the higher layer’s information (Request, URL, Cookie, etc)&lt;/p&gt;
 
-&lt;p&gt;In this artical, we’ve checked a few example of Istio doing traffice management around load balancing and routing, but there are more things we could tweak with Istio, like retries, outlier detection, etc. We will touch these points in following articles.&lt;/p&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">As many of the students who have studied computer science, networking is definitely a part that is very important, but easy to forget after graduation.</summary></entry><entry><title type="html">Istio Vs Envoy</title><link href="http://localhost:4000/blog/istio/2023/11/20/Istio-Vs-Envoy.html" rel="alternate" type="text/html" title="Istio Vs Envoy" /><published>2023-11-20T17:00:00+08:00</published><updated>2023-11-20T17:00:00+08:00</updated><id>http://localhost:4000/blog/istio/2023/11/20/Istio-Vs-Envoy</id><content type="html" xml:base="http://localhost:4000/blog/istio/2023/11/20/Istio-Vs-Envoy.html">&lt;p&gt;If you looked at the documentation of Istio, this terminology &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; appears multiple ones. Also, there are some concepts like &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;EnvoyFilter&lt;/code&gt;  that you might come up in the Istio documentation.&lt;/p&gt;
+&lt;p&gt;In this artical, we’ve checked a few example of Istio doing traffice management around load balancing and routing, but there are more things we could tweak with Istio, like retries, outlier detection, etc. We will touch these points in following articles.&lt;/p&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">As many of the students who have studied computer science, networking is definitely a part that is very important, but easy to forget after graduation.</summary></entry><entry><title type="html">Istio Vs Envoy</title><link href="http://localhost:4000/istio/2023/11/20/Istio-Vs-Envoy.html" rel="alternate" type="text/html" title="Istio Vs Envoy" /><published>2023-11-20T17:00:00+08:00</published><updated>2023-11-20T17:00:00+08:00</updated><id>http://localhost:4000/istio/2023/11/20/Istio-Vs-Envoy</id><content type="html" xml:base="http://localhost:4000/istio/2023/11/20/Istio-Vs-Envoy.html">&lt;p&gt;If you looked at the documentation of Istio, this terminology &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; appears multiple ones. Also, there are some concepts like &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;EnvoyFilter&lt;/code&gt;  that you might come up in the Istio documentation.&lt;/p&gt;
 
 &lt;p&gt;Assuming you’ve already had experience of instealling Istio, you may find there are two essential kubernetes components - &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istiod&lt;/code&gt; deployment and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; sidecar container. And in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;istio-proxy&lt;/code&gt; container you can find  there is this &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;envoy&lt;/code&gt; process forked from &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;pilot-agent&lt;/code&gt;&lt;/p&gt;
 
@@ -836,7 +836,7 @@ istio-p+    95  0.0  0.0  34424  2712 pts/0    R+   04:58   0:00 ps aux
 
 &lt;p&gt;From my personsal experience, envoy configuration is completely unfriendly to freshers of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Istio&lt;/code&gt;. The biggest problem of it is that it contains too many terminalogies, covers a lot of topics, but lacks of examples.&lt;/p&gt;
 
-&lt;p&gt;Usually I would go to &lt;a href=&quot;https://github.com/envoyproxy/envoy/issues&quot;&gt;envoyproxy github issues&lt;/a&gt; and search for keywords. I could always get inspirations from the detailed configurations under the issue descriptions and replies.&lt;/p&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">If you looked at the documentation of Istio, this terminology envoy appears multiple ones. Also, there are some concepts like EnvoyFilter that you might come up in the Istio documentation.</summary></entry><entry><title type="html">Introduction</title><link href="http://localhost:4000/blog/istio/2023/11/20/Introduction.html" rel="alternate" type="text/html" title="Introduction" /><published>2023-11-20T16:00:00+08:00</published><updated>2023-11-20T16:00:00+08:00</updated><id>http://localhost:4000/blog/istio/2023/11/20/Introduction</id><content type="html" xml:base="http://localhost:4000/blog/istio/2023/11/20/Introduction.html">&lt;p&gt;I started to get in touch with Istio from 2020, when the Istio version was still around 1.6-ish. I was not the person who introduced Istio to the company, there was another engineer who was also a newbie to Istio, spending some time studying it, then installed and created the initial setup of istio eco system, and the company started to use it.&lt;/p&gt;
+&lt;p&gt;Usually I would go to &lt;a href=&quot;https://github.com/envoyproxy/envoy/issues&quot;&gt;envoyproxy github issues&lt;/a&gt; and search for keywords. I could always get inspirations from the detailed configurations under the issue descriptions and replies.&lt;/p&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">If you looked at the documentation of Istio, this terminology envoy appears multiple ones. Also, there are some concepts like EnvoyFilter that you might come up in the Istio documentation.</summary></entry><entry><title type="html">Introduction</title><link href="http://localhost:4000/istio/2023/11/20/Introduction.html" rel="alternate" type="text/html" title="Introduction" /><published>2023-11-20T16:00:00+08:00</published><updated>2023-11-20T16:00:00+08:00</updated><id>http://localhost:4000/istio/2023/11/20/Introduction</id><content type="html" xml:base="http://localhost:4000/istio/2023/11/20/Introduction.html">&lt;p&gt;I started to get in touch with Istio from 2020, when the Istio version was still around 1.6-ish. I was not the person who introduced Istio to the company, there was another engineer who was also a newbie to Istio, spending some time studying it, then installed and created the initial setup of istio eco system, and the company started to use it.&lt;/p&gt;
 
 &lt;p&gt;Unfortunately, not long after it was introduced, the guy who introduced Istio to the company resigned. He was the person who had the best knowledge of Istio by then (yet can not say he was a master of Istio). He tried his best to do the knowledge transfer before his last day, and I tried my best to digest them.&lt;/p&gt;
 
@@ -856,4 +856,271 @@ istio-p+    95  0.0  0.0  34424  2712 pts/0    R+   04:58   0:00 ps aux
   &lt;li&gt;You do not use Istio&lt;/li&gt;
   &lt;li&gt;You are a veteran of Istio&lt;/li&gt;
   &lt;li&gt;You want to learn Istio in the “right” way&lt;/li&gt;
-&lt;/ul&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">I started to get in touch with Istio from 2020, when the Istio version was still around 1.6-ish. I was not the person who introduced Istio to the company, there was another engineer who was also a newbie to Istio, spending some time studying it, then installed and created the initial setup of istio eco system, and the company started to use it.</summary></entry></feed>
+&lt;/ul&gt;</content><author><name>Yangyang Zhao</name></author><category term="istio" /><summary type="html">I started to get in touch with Istio from 2020, when the Istio version was still around 1.6-ish. I was not the person who introduced Istio to the company, there was another engineer who was also a newbie to Istio, spending some time studying it, then installed and created the initial setup of istio eco system, and the company started to use it.</summary></entry><entry><title type="html">How Do We Use Envoy To Improve Php Redis Client Performance</title><link href="http://localhost:4000/envoy/2021/07/30/How-do-we-use-Envoy-to-improve-PHP-Redis-client-performance.html" rel="alternate" type="text/html" title="How Do We Use Envoy To Improve Php Redis Client Performance" /><published>2021-07-30T16:00:00+08:00</published><updated>2021-07-30T16:00:00+08:00</updated><id>http://localhost:4000/envoy/2021/07/30/How-do-we-use-Envoy-to-improve-PHP-Redis-client-performance</id><content type="html" xml:base="http://localhost:4000/envoy/2021/07/30/How-do-we-use-Envoy-to-improve-PHP-Redis-client-performance.html">&lt;p&gt;Redis plays a very important role in Houzz’s technical stack - we used it for as  key-value storage, caching layer, queue system, etc.&lt;/p&gt;
+
+&lt;p&gt;Redis uses standard TCP protocol for clients to connect to it, to connect to a single Redis instance, the client just need to establish a TCP connection with Redis server, and send raw command using text. You could easily test a connection to Redis server using &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;telnet&lt;/code&gt; command.&lt;/p&gt;
+
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;bash-3.2$ telnet 127.0.0.1 6379
+Trying 127.0.0.1...
+Connected to 127.0.0.1.
+Escape character is &apos;^]&apos;.
+PING
++PONG
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;redis-cluster&quot;&gt;Redis Cluster&lt;/h2&gt;
+
+&lt;p&gt;As many other storage systems, Redis also has distributed mode -  it is called Redis cluster. The way how Redis scales from 1 instances to muiltiple instances is relying on the KEY hashing. As a key value storage system, Redis cluster will try to distributed all KEYs into different instances based on the CRC hash of the KEY. Each instance in the Redis cluster only stores KEYs within its own slots ranges, and all instances in the Redis custer will cover the whole range of CRC hash which is [0, 16384].&lt;/p&gt;
+
+&lt;p&gt;Redis also support primary / secondary mode which could provides data redudancy and seperate read/update opertions. Each slot range can have 1 primary instance, with 1 or more replica instances storing the same KEYs.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/imgs/redis_cluster.svg&quot; alt=&quot;Redis Cluster&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The operations on single Redis instance varies from it on Redis cluster. To use single Redis instance, we just connect to the single socket address, to use a Redis cluster, we would need to have more complicated logic. Typically, a Redis cluster client need to support the following features:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;Automatically discover cluster topology. Since KEYs are stored in different Redis server instances, the Redis cluster client has to know which slot range is stored in which Redis server instances (including primary / replicas). Redis cluster provides a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;CLUSTER SLOTS&lt;/code&gt; command that can return the server topology with arrays of slot range and primary/replica socket addresses. To execute the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;CLUSTER SLOTS&lt;/code&gt; command, the Redis cluster client need to know at least the address of 1 nodes in the Redis cluster topology, which is usually passed in as start probe address(es) when inititalizing the client instance.&lt;/li&gt;
+  &lt;li&gt;On demand dispatch commands to Redis server instance. When using Redis cluster client to send a command that carries KEY(s) parameter to the Redis cluster, the client has to determine which Redis server instance(s) should the command to sent to. How to detemine them is based on the server topology fetcher in previous step, to calculate the CRC hash of the KEY(s), then find the slot range that the KEY resides, and then based on the read / write policy, to send the command to the primary / replica Redis server instance of the slot range that the KEY belongs to. For some commands operating multiple KEYs (e.g. mget, mset, etc), the client has to split the single multiple key command into several batches based on the slot range group of the KEYs, and send the command with each group’s KEYs to the corresponding Redis server instance, and merge the results from all instances. Some client libraries didn’t implement this “advanced” feature, therefore they declare they don’t support multi-key commands with keys across slots.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;There are already a lot of &lt;a href=&quot;https://redis.io/clients&quot;&gt;Redis client libraries&lt;/a&gt; developed in different languages that could help to mitigate the difference of connecting to a single Redis client or Redis cluster.  In most of the senarios, programmers won’t notice the difference of using single Redis instance or Redis cluster, since the complexity is capsulated by the client libraries.&lt;/p&gt;
+
+&lt;h2 id=&quot;php-redis-cluster-client-and-the-problem&quot;&gt;PHP Redis Cluster Client and the Problem&lt;/h2&gt;
+
+&lt;p&gt;A single Redis instance can satisfy the small use cases, at the scale of supporting Houzz’s business, we have to Redis cluster vs single Redis instance since we’ve stored TBs data in Redis and it has to be distributed into different instances.&lt;/p&gt;
+
+&lt;p&gt;As the time of 2021, we’ve setup a Redis cluster with 200+ instances, with primary / replica enabled, to make sure we have data redundancy and ability to recover from single instance failure.&lt;/p&gt;
+
+&lt;p&gt;As historical reasons, Houzz’s major programming language is PHP, it is still one of the most popular programming language in web development. And we use &lt;a href=&quot;https://github.com/predis/predis&quot;&gt;predis&lt;/a&gt;, a widely used PHP Redis client that supports Redis cluster, it provides the feature such as automatic cluster topology discovery and on demand dispatch commands to Redis server instance.&lt;/p&gt;
+
+&lt;p&gt;Funtionality wise, we are satisified with the PHP redis client, however, the nature of PHP language itself gives us very big challange on the performance side.&lt;/p&gt;
+
+&lt;p&gt;Unlike Java, Python or Node server applications, PHP process does not share data between subsequent requests. Once PHP handles a web request, it will discard all the data before it’s ready to handle the next request.&lt;/p&gt;
+
+&lt;p&gt;Why does this hurt the performance of the Redis cluster client?&lt;/p&gt;
+
+&lt;p&gt;First of all, the cluster topology will not be shared across requests. Suppose predis first connect to one of the start probe redis server instance, send &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;CLUSTER SLOTS&lt;/code&gt; command, and got the cluster topology in the handling of one request, the topology, which is usually a nested &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;array&lt;/code&gt; in memory will not be used in the next request. Therefore, in the next request, predis has to connect to one of the start probe again, and send &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;CLUSTER SLOTS&lt;/code&gt; again to get the cluster topology. This is exremely ineffective since Redis cluster topology rarely changes (usually it only changes when we take some redis nodes down or add new redis nodes, which will cause a rebalance). The extra &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;CLUSTER SLOTS&lt;/code&gt; command usually add up 4 ~ 5 ms to the redis access time per request, if in the request, there are only 1 redis operation needed, then we added 100% overhead than it’s supposed to be.&lt;/p&gt;
+
+&lt;p&gt;Another nature behavior of PHP process is that, you can not persist any TCP connections between two requests.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/imgs/redis_connection.svg&quot; alt=&quot;Redis Connection&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;As described in the above graph, suppose we have 2 PHP processes running on a single machine, with 2 requests been handled per process, and each request will need to connect to 2 Redis server instances. The subsequantial requests handled by the same process will connect to the same redis server instance, yet since the previous request’s TCP connection is closed, it can not be reused, so even it connects to the same socket address (of the Redis server instance), it has to create another TCP connection.&lt;/p&gt;
+
+&lt;p&gt;So as a PHP process is handling more and more requests, it creates / closes more and more TCP connections to Redis clusters. Compared to other languages which could maintain persistent TCP connections in the process, this is already a big performance loss.&lt;/p&gt;
+
+&lt;p&gt;Another more critical problem is, a TCP connection’s termination is not a direct close and not releasing the resource immediately.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/imgs/tcp.svg&quot; alt=&quot;TCP lifecycle&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;As described in the above graph, in active close mode, when the TCP connection initiator (in this case the PHP redis cluster client) started to close the the connection, it sends a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;FIN&lt;/code&gt; packet through the TCP connection, the TCP connectino receiver (Redis cluster instance) will need to send &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ACK&lt;/code&gt; + &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;FIN&lt;/code&gt; packet back. Due to the nature of TCP connection, initiator will turn into &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TIME_WAIT&lt;/code&gt; status until finally it timeout and connection is finally closed, the TCP connection resource is recycled by system.&lt;/p&gt;
+
+&lt;p&gt;Due to the PHP Redis cluster client access pattern, it keeps creating new TCP connections to PHP Redis cluster instances and closes them immediately after 1 session ends. Due to the QPS of our production traffic volume to 1 box, it leaves too many  &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TIME_WAIT&lt;/code&gt; TCP connections in the box. Once &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TIME_WAIT&lt;/code&gt; TCP connections pile up, new TCP connections are slower to be created, thus making Redis cluster client to be slower, and causing web request responding time to increase, more requests are stucking. In the end, it reaches the threshold that Redis cluster client failed to create TCP connections within the timeout settings time (4s), and it will throw an error saying Redis server is down.&lt;/p&gt;
+
+&lt;p&gt;We noticed this issue from last year when our access volume significant increased (from business perspective it’s a very good sign!), and we were seeing more errors complaining about Redis server down and performance degradation during the peek hours.  But Redis servers actually are not on high pressure at all, the bottleneck is purely from the TCP connections from the client side. While to solve this, every time SRE team has to increase the instances of our application boxes, which is unnessasary, and a waste of our computing resources.&lt;/p&gt;
+
+&lt;h2 id=&quot;finding-solutions&quot;&gt;Finding Solutions&lt;/h2&gt;
+
+&lt;p&gt;If you google/stackoverflow “too many TIME_WAIT tcp connections” keywords, some of the blogs will lead to the following solution: Enable tcp resuse feature to reduce the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TIME_WAIT&lt;/code&gt; TCP connections.&lt;/p&gt;
+
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;sysctl -w net.ipv4.tcp_tw_reuse=1
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;We believed this would work, and added this option to the system default setting of our production boxes, however, it didn’t help. The TCP connections in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TIME_WAIT&lt;/code&gt; state are still high.&lt;/p&gt;
+
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;root@web-server:/# sysctl net.ipv4.tcp_tw_reuse=1
+net.ipv4.tcp_tw_reuse = 1
+root@web-server:/# ss -tan state time-wait | grep 6379 | wc -l
+70145
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;Inspired by &lt;a href=&quot;https://vincent.bernat.ch/en/blog/2014-tcp-time-wait-state-linux#netipv4tcp_tw_reuse&quot;&gt;Coping with the TCP TIME-WAIT state on busy Linux servers&lt;/a&gt; blog post, we think we found the reason why it didn’t work.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;By enabling net.ipv4.tcp_tw_reuse, Linux will reuse an existing connection in the TIME-WAIT state for a new outgoing connection if the new timestamp is strictly bigger than the most recent timestamp recorded for the previous connection: an outgoing connection in the TIME-WAIT state can be reused after just one second.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Within “Just one second”, since the QPS of the box is around 100, it will probably create ~ 100 (avg QPS) * 50 (avg # of redis connections in 1 request) = 5,000 new TCP connections, and these 5K connections can not reuse the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TIME_WAIT&lt;/code&gt; connections left intact in the exact second. Before it could benefit from the tcp reuse mechanism, the too many &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TIME_WAIT&lt;/code&gt; TCP connections hold up the kernal from creating new TCP connections, thus this didn’t help much.&lt;/p&gt;
+
+&lt;h2 id=&quot;envoy--envoy-redis-cluster&quot;&gt;Envoy / Envoy Redis Cluster&lt;/h2&gt;
+
+&lt;p&gt;Since the year of 2020, we introduced Istio as our service mesh solution to our Kubernetes cluster, and it started to play as the proxy for all network traffic from / to our web application container.&lt;/p&gt;
+
+&lt;p&gt;Envoy, as the proxy implementation of Istio, provides a lot of features that helps the abstract the networking logic from application code.&lt;/p&gt;
+
+&lt;p&gt;One inspiring feature that Envoy provides in the newer versions, which is the final solution we used for solving this issue, is &lt;a href=&quot;https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/other_protocols/redis#redis-cluster-support-experimental&quot;&gt;Redis Cluster support&lt;/a&gt;.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a non-cluster Redis client implemented in any language to connect to the proxy as if it’s a single node Redis instance. The Envoy proxy will keep track of the cluster topology and send commands to the correct Redis node in the cluster according to the spec. Advance features such as reading from replicas can also be added to the Envoy proxy instead of updating redis clients in each language.&lt;/p&gt;
+
+  &lt;p&gt;Envoy proxy tracks the topology of the cluster by sending periodic cluster slots commands to a random node in the cluster, and maintains the following information:&lt;/p&gt;
+
+  &lt;ul&gt;
+    &lt;li&gt;List of known nodes.&lt;/li&gt;
+    &lt;li&gt;The primaries for each shard.&lt;/li&gt;
+    &lt;li&gt;Nodes entering or leaving the cluster.&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;With this feature enabled, mthe PHP Redis client’s cluster related logic will be taken over by Envoy. PHP Redis client only need to create one connection to the proxied Redis instance provided by Envoy.&lt;/p&gt;
+
+&lt;p&gt;It took us for a while to figure out how exactly to configure the Envoy Redis cluster proxy, due to the lack of examples provided. But we finally figured out the configuration, first of all, we need to create a backend cluster.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;EnvoyFilter&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;redis-cluster-backend&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;configPatches&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;applyTo&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;CLUSTER&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;patch&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;operation&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;INSERT_FIRST&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;value&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;cluster_type&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;envoy.clusters.redis&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;typed_config&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;s1&quot;&gt;&apos;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@type&apos;&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;type.googleapis.com/google.protobuf.Struct&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;value&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;cluster_refresh_rate&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;1800s&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;cluster_refresh_timeout&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;4s&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;host_degraded_refresh_threshold&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;redirect_refresh_interval&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;4s&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;redirect_refresh_threshold&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;connect_timeout&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;4s&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;dns_lookup_family&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;V4_ONLY&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;load_assignment&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;cluster_name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;custom-redis-cluster&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;endpoints&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;lb_endpoints&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;endpoint&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;na&quot;&gt;address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                  &lt;span class=&quot;na&quot;&gt;socket_address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                    &lt;span class=&quot;na&quot;&gt;address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;lt;redis instance 1 ip&amp;gt;&lt;/span&gt;
+                    &lt;span class=&quot;na&quot;&gt;port_value&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;lt;redis instance 1 port&amp;gt;&lt;/span&gt;
+            &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;endpoint&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;na&quot;&gt;address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                  &lt;span class=&quot;na&quot;&gt;socket_address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                    &lt;span class=&quot;na&quot;&gt;address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;lt;redis instance 2 ip&amp;gt;&lt;/span&gt;
+                    &lt;span class=&quot;na&quot;&gt;port_value&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;lt;redis instance 1 port&amp;gt;&lt;/span&gt;
+            &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;endpoint&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;na&quot;&gt;address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                  &lt;span class=&quot;na&quot;&gt;socket_address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                    &lt;span class=&quot;na&quot;&gt;address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;lt;redis instance 3 port&amp;gt;&lt;/span&gt;
+                    &lt;span class=&quot;na&quot;&gt;port_value&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&amp;lt;redis instance 3 port&amp;gt;&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;redis-cluster-backend&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;outlier_detection&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;base_ejection_time&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;20s&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;consecutive_5xx&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;interval&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;5s&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;upstream_connection_options&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;tcp_keepalive&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;keepalive_interval&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;5&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;keepalive_probes&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;keepalive_time&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;30&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;In the backend settings, the most important settings is the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;load_assignment&lt;/code&gt;, it basically describes the startuo probe nodes that envoy will send &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;CLUSTER SLOTS&lt;/code&gt; command to get the cluster topology.&lt;/p&gt;
+
+&lt;p&gt;There are definitely quite a few settings worth being tuned to get better performance:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;&lt;strong&gt;cluster_refresh_rate&lt;/strong&gt;:  This is the interval between &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;CLUSTER SLOTS&lt;/code&gt; commands sent from envoy to startup probe nodes. Typically redis cluster topology won’t change that frequently, so we could set this value much longer than default value (5s)&lt;/li&gt;
+  &lt;li&gt;&lt;strong&gt;host_degraded_refresh_threshold&lt;/strong&gt;: The number of hosts became degraded or unhealthy before triggering a topology refresh request. This is very helpful, since we will configure &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;cluster_refresh_rate&lt;/code&gt; to be as long as possible, once the redis cluster topology changed between two refresh, this config setting to a low value (1 for most aggresive) will immediately let Envoy to send &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;CLUSTER SLOS&lt;/code&gt; command to get the new topology, to remove potential problematic node out of the connection pools.&lt;/li&gt;
+  &lt;li&gt;&lt;strong&gt;redirect_refresh_threshold&lt;/strong&gt;: The number of redirection errors that must be received before triggering a topology refresh request. Sometimes, when we add / remove nodes from Redis cluster, the key will rebalance among the new cluster instances, it will cause some response to be &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;MOVED&lt;/code&gt; or &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ASK&lt;/code&gt;, in this case, we should let Envoy to send &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;CLUSTER SLOS&lt;/code&gt; command to get the new topology immeidately.&lt;/li&gt;
+  &lt;li&gt;&lt;strong&gt;outlier_detection&lt;/strong&gt;: &lt;a href=&quot;https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/outlier&quot;&gt;Outlie detection&lt;/a&gt; is unified mechanism in Envoy to detect outlited upstream hosts. In Envoy Redis cluster, an upstream means 1 redis cluster server in the topology. Suppose a redis cluster node was suddenly down, the following request to the node will get ERR response. The &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;consecutive_5xx&lt;/code&gt; setting is the threshold of ERR responses in past &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;interval&lt;/code&gt; time so as to consider the node to be unhealthy. Once the node is considered unhealthy, it will be taken out of the upstream servers, and will tried to be put back after &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;base_ejection_time&lt;/code&gt;, and exponentially backoff in following degradations.&lt;/li&gt;
+  &lt;li&gt;&lt;strong&gt;upstream_connection_options&lt;/strong&gt;: This is mostly for tuning the keep alive setting for TCP connections between Envoy and Redis cluster nodes. Envoy will on demandly connect to Redis cluster nodes if PHP client tries to send a command to the destination nodes, after the command is sent, the connection remains &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ESTABLISED&lt;/code&gt; state. But if the connnection stays too long time without sending any packages to Redis cluster node, it might be closed by the Redis cluster node, in order to extend the life of the TCP connection, we could configure Envoy sending keepalive packet to Redis cluster node after &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;keepalive_time&lt;/code&gt; since the connection is established, and set it to send &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;keepalive_probes&lt;/code&gt; times keepalive interval with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;keep_alive&lt;/code&gt; interval.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;We also need to create a frontend in Envoy to let the PHP client in main container to connect.&lt;/p&gt;
+
+&lt;div class=&quot;language-yaml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;na&quot;&gt;apiVersion&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;networking.istio.io/v1alpha3&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;kind&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;EnvoyFilter&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;metadata&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;redis-cluster-frontend&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;spec&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;configPatches&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+  &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;applyTo&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;LISTENER&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;match&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;context&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;SIDECAR_OUTBOUND&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;patch&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;operation&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;ADD&lt;/span&gt;
+      &lt;span class=&quot;na&quot;&gt;value&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;na&quot;&gt;socket_address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;address&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;127.0.10.1&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;port_value&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;6379&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;protocol&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;TCP&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;filter_chains&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;filters&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+          &lt;span class=&quot;pi&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;envoy.filters.network.redis_proxy&lt;/span&gt;
+            &lt;span class=&quot;na&quot;&gt;typed_config&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+              &lt;span class=&quot;s1&quot;&gt;&apos;&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@type&apos;&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;prefix_routes&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;na&quot;&gt;catch_all_route&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                  &lt;span class=&quot;na&quot;&gt;cluster&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;redis-cluster-backend&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;settings&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;na&quot;&gt;enable_hashtagging&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;true&lt;/span&gt;
+                &lt;span class=&quot;na&quot;&gt;enable_redirection&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;true&lt;/span&gt;
+                &lt;span class=&quot;na&quot;&gt;op_timeout&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;4s&lt;/span&gt;
+                &lt;span class=&quot;na&quot;&gt;read_policy&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;PREFER_REPLICA&lt;/span&gt;
+              &lt;span class=&quot;na&quot;&gt;stat_prefix&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;redis_proxy&lt;/span&gt;
+        &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;pi&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;redis-cluster-frontend&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The above configuraion creates a Redis proxy frontend on &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;127.0.10.1:6379&lt;/code&gt;. This address is available to the other containers aside from istio-proxy. The most importan config, is &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;prefix_routes.catch_all_route&lt;/code&gt; to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;redis-cluster-backend&lt;/code&gt; cluster which is the exact backend cluster we created before. The config of proxy frontend is relatively simple, with fewer settings could be tuned, one important setting is &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;read_policy&lt;/code&gt;, we chose &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;PREFER_REPLICA&lt;/code&gt; to achive the functional parity as the original PHP Redis cluster client’s logic - when reading from redis (get, mget, etc), always try to read from replica nodes, only read from primary nodes when all replica nodes for the slots were not available.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/imgs/istio.svg&quot; alt=&quot;Envoy Proxy Cluster&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The above graph directly shows the magic why using Envoy Redis cluster proxy could save TCP connections.&lt;/p&gt;
+
+&lt;p&gt;Before, suppose in 1 request handling process PHP Redis client needs to connect to X Redis cluster instaces, it has to create X TCP connections from main web server container to istio-proxy container, and envoy has to create corresponding X TCP connections from istio-proxy container to Redis cluster instances.&lt;/p&gt;
+
+&lt;p&gt;After using the Envoy Redis cluster proxy, PHP client only needs to connect to the frontend proxy in istio-proxy container, and Envoy will “smartly” dispatch the commands to proxy backend, and create connections to X Redis cluster servers.&lt;/p&gt;
+
+&lt;p&gt;We saved X - 1 TCP connections for one request handled by the PHP process. What’s more, the X connections created between Envoy Redis cluster proxy backend and the real Redis cluster services are persistent connections, they do not close after the PHP process finished handling 1 request. Also, other requests handled by other PHP processes in the main web server container could also reuse the connections since the frontend and backend is seperated. These all leads to a huge save of TCP connections.&lt;/p&gt;
+
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;root@web-server:/# ss -tan state time-wait | grep 6379 | wc -l
+3108
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;By doing this, we broke the nature limitation of PHP language, we reduced &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TIME_WAIT&lt;/code&gt; tcp connections by 95%!&lt;/p&gt;
+
+&lt;p&gt;Also, we see great reduce of average redis connection time per request dropped from ~5ms to nearly 0ms! This is contributed by:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;Much fewer connections needs to be made since all commands are sent to to the same frontend proxy by PHP client, thus only 1 connection needs to be created per requet.&lt;/li&gt;
+  &lt;li&gt;Connection to the frontend is via local network (from main container to istio-proxy container), which is much stable and lightweighted.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;We roll out this solution 100% on our production k8s clusters, and indeed, it solved the bottleneck of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TIME_WAIT&lt;/code&gt; TCP connections, and enabled our Pods to be able to take more traffic. It also leads to some save of the k8s resources.&lt;/p&gt;
+
+&lt;h2 id=&quot;caveats&quot;&gt;Caveats&lt;/h2&gt;
+
+&lt;p&gt;While we talked all good things about Envoy Redis cluster proxy, there are certainly some caveats for using it.&lt;/p&gt;
+
+&lt;h3 id=&quot;read--write-performance-degradation&quot;&gt;Read / Write performance degradation&lt;/h3&gt;
+&lt;p&gt;We mentioned the average TCP connection time reduced from ~ 5m to nearly 0ms in the last chapter. But for read / write redis operations, the performance degradated a bit. This is easy to understand. Envoy still needs to create the TCP connections to Redis cluster nodes, and it still needs to send the command packages to the nodes, and receive the responses, even more logic was added to dispatch commands to the correct node(s) and aggregate responses from multiple nodes (e.g. mget, mset). This degradation was more obvious for sparse request when the TCP connection reuse in the proxy backend wasn’t giving much benefit.&lt;/p&gt;
+
+&lt;p&gt;We noticed this consistent performance degradation while we were finally OK with it - the overall average read / write time was fast enough comparing to rest of PHP code logic.&lt;/p&gt;
+
+&lt;h3 id=&quot;lack-of-retry-logic&quot;&gt;Lack of retry logic&lt;/h3&gt;
+
+&lt;p&gt;There was an very important feature in the old PHP Redis Cluster client, which is the auto retry logic.&lt;/p&gt;
+
+&lt;p&gt;Generally for each shard of the Redis cluster, it consists of 1 primary node and 2 replica nodes. When PHP Redis cluster client is to send a read command, it first will pick a random replica to send the command, if the command failed due to network commnunication issue, it will retry to send the command to the other replica node, if it still fails, it will ultimately send the command to the primary node.&lt;/p&gt;
+
+&lt;p&gt;This logic is straightforward and is very helpful to mitigate the downtime. Suppose we are doing a rolling restart of the whole Redis cluster, typically we will restart 1 node at one time, the retry logic will make sure the request can still be properly handled.&lt;/p&gt;
+
+&lt;p&gt;Unfortunately, Built-in retry logic is still on the &lt;a href=&quot;https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/other_protocols/redis&quot;&gt;planned future features list&lt;/a&gt; at the moment of Mid 2021, as we tested putting down 1 replica node in 1 shard, we noticed there were around 10 seconds downtime when we see client errors of “no upstream hosts” from Envoy. This down time could be mitigated by tuning the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;outlier_detection&lt;/code&gt; settings, when the node is down, subsequential requests to the specific node will be errored out, after the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;outlier_detection.interval&lt;/code&gt; time, it will be taken out of the upstreams and Envoy will stop sending any more commands to this node.&lt;/p&gt;
+
+&lt;p&gt;Currently there is no good way to bypass this issue. Even we retry within the PHP client, the PHP client couldn’t decide which Redis cluster node that Envoy will connect.&lt;/p&gt;
+
+&lt;p&gt;We lived with this lack of retry logic, and rely on the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;outlier_detection&lt;/code&gt; mechanism to mitigate the downtime, and we really hope the built-in retry logic could be supported soon.&lt;/p&gt;
+
+&lt;h3 id=&quot;too-many-established-connections&quot;&gt;Too many ESTABLISHED connections&lt;/h3&gt;
+
+&lt;p&gt;This is a problem we forsee, that before our PHP clients create TCP connections to Redis cluster nodes, and disconnect soon after the request is processed. The “come and go” pattern actually has a benefit that overall Redis cluster nodes do not have too many &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ESTABLISHED&lt;/code&gt; connections from the clients.&lt;/p&gt;
+
+&lt;p&gt;Ever since we start testing using Envoy Redis cluster proxy, we immediately noticed dramatic increase of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ESTABLISHED&lt;/code&gt; connections from the Redis server nodes. The increased persistent connections have been impacted the connection performance - if 1 Redis cluster node has been connected by too many clients, newer connections will be hard to made.&lt;/p&gt;
+
+&lt;p&gt;To improve this, we tuned down &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;timeout&lt;/code&gt; setting in redis.conf on the Redis server side from 300 seconds to half of the value, and it helped to reduce 30% of the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ESTABLISHED&lt;/code&gt; connections in our workload. The &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;timeout&lt;/code&gt; setting let Redis server side to close the connection after a client is idle for that long time. However, there is always the trade off - The shorter we configured the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;timeout&lt;/code&gt; setting, the more likely Envoy will have to connect more frequently to Redis cluster nodes, and impact the overall Redis client performance.&lt;/p&gt;
+
+&lt;p&gt;Another solution, is to increase the Redis cluster nodes number, so average connections to 1 Redis cluster nodes will drop, however, this will cause unessasary resource waste if Redis workload is not high on each node.&lt;/p&gt;</content><author><name>Yangyang Zhao</name></author><category term="envoy" /><summary type="html">Redis plays a very important role in Houzz’s technical stack - we used it for as key-value storage, caching layer, queue system, etc.</summary></entry></feed>

@@ -1,6 +1,7 @@
 Yangyang Zhao:
-  name        : "Yangyang Zhao"
-  bio         : "Senior Staff Site Reliability Engineer"
+  name: "Yangyang Zhao"
+  bio: "Senior Staff Site Reliability Engineer"
+  avatar: "https://avatars.githubusercontent.com/Angelbear"
   links:
     - label: "Email"
       icon: "fas fa-fw fa-envelope-square"

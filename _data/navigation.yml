@@ -1,4 +1,13 @@
 main:
-  - title: "Istio"
-    url: /istio/
-    
+  - title: Engineering
+    children:
+      - title: "Istio"
+        url: /istio/
+      - title: "Envoy"
+        url: /envoy/
+  - title: Fun & Tools
+    children:
+      - title: "Bingo"
+        url: /bingo/
+      - title: "Calculations"
+        url: /calculations/

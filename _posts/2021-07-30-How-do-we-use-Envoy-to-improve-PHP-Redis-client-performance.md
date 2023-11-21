@@ -1,5 +1,9 @@
-# How do we use Envoy to improve PHP Redis client performance
-
+---
+layout: single
+categories: envoy
+date:  2021-07-30 16:00:00 +0800
+author: Yangyang Zhao
+---
 
 Redis plays a very important role in Houzz's technical stack - we used it for as  key-value storage, caching layer, queue system, etc. 
 
@@ -21,7 +25,7 @@ As many other storage systems, Redis also has distributed mode -  it is called R
 Redis also support primary / secondary mode which could provides data redudancy and seperate read/update opertions. Each slot range can have 1 primary instance, with 1 or more replica instances storing the same KEYs. 
  
 
-![Redis Cluster](redis_cluster.svg)
+![Redis Cluster](/assets/imgs/redis_cluster.svg)
 
 The operations on single Redis instance varies from it on Redis cluster. To use single Redis instance, we just connect to the single socket address, to use a Redis cluster, we would need to have more complicated logic. Typically, a Redis cluster client need to support the following features:
 
@@ -48,7 +52,7 @@ First of all, the cluster topology will not be shared across requests. Suppose p
 
 Another nature behavior of PHP process is that, you can not persist any TCP connections between two requests. 
 
-![Redis Connection](redis_connection.svg)
+![Redis Connection](/assets/imgs/redis_connection.svg)
 
 As described in the above graph, suppose we have 2 PHP processes running on a single machine, with 2 requests been handled per process, and each request will need to connect to 2 Redis server instances. The subsequantial requests handled by the same process will connect to the same redis server instance, yet since the previous request's TCP connection is closed, it can not be reused, so even it connects to the same socket address (of the Redis server instance), it has to create another TCP connection.
 
@@ -56,7 +60,7 @@ So as a PHP process is handling more and more requests, it creates / closes more
 
 Another more critical problem is, a TCP connection's termination is not a direct close and not releasing the resource immediately.
 
-![TCP lifecycle](tcp.svg)
+![TCP lifecycle](/assets/imgs/tcp.svg)
 
 As described in the above graph, in active close mode, when the TCP connection initiator (in this case the PHP redis cluster client) started to close the the connection, it sends a `FIN` packet through the TCP connection, the TCP connectino receiver (Redis cluster instance) will need to send `ACK` + `FIN` packet back. Due to the nature of TCP connection, initiator will turn into `TIME_WAIT` status until finally it timeout and connection is finally closed, the TCP connection resource is recycled by system.
 
@@ -210,7 +214,7 @@ spec:
 The above configuraion creates a Redis proxy frontend on `127.0.10.1:6379`. This address is available to the other containers aside from istio-proxy. The most importan config, is `prefix_routes.catch_all_route` to `redis-cluster-backend` cluster which is the exact backend cluster we created before. The config of proxy frontend is relatively simple, with fewer settings could be tuned, one important setting is `read_policy`, we chose `PREFER_REPLICA` to achive the functional parity as the original PHP Redis cluster client's logic - when reading from redis (get, mget, etc), always try to read from replica nodes, only read from primary nodes when all replica nodes for the slots were not available.
 
 
-![Envoy Proxy Cluster](istio.svg)
+![Envoy Proxy Cluster](/assets/imgs/istio.svg)
 
 The above graph directly shows the magic why using Envoy Redis cluster proxy could save TCP connections.
 

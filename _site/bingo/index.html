@@ -1,0 +1,104 @@
+<html>
+    <meta charset="UTF-8">
+    <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <!-- Load Babel -->
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Your custom script here -->
+    <style>
+        @import url(//netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css);
+
+        .root-container {
+            width: 64%;
+            margin: auto;
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: auto auto auto auto auto;
+        }
+        .grid-item {
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(0, 0, 0, 0.8);
+            padding-top: 100%;
+            width: 100%;
+            position: relative;
+        }
+        .grid-item-label {
+            font-size: 5em;
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+        }
+        .grid-item-label.star:before {
+            content: '\f005';
+            font-family: FontAwesome;
+        }
+    </style>
+    <script type="text/babel">
+        const range = (size, startAt = 0) => [...Array(size).keys()].map(i => i + startAt);
+
+        const genenateRandomBingoCard = () => {
+            const initialColumeValue = [0, 0, 0, 0, 0];
+            const initialCardRows = [initialColumeValue.slice(0),
+                initialColumeValue.slice(0),
+                initialColumeValue.slice(0),
+                initialColumeValue.slice(0),
+                initialColumeValue.slice(0)];
+            for (var i = 0; i < 5; i++) {
+                const rangeValue = range(15, i * 15 + 1);
+                for (var j = 0; j < 5 ; j++) {
+                    const pickIndex = Math.floor(Math.random() * (15 - j));
+                    initialCardRows[i][j] = rangeValue[pickIndex];
+                    rangeValue.splice(pickIndex, 1);
+                }
+            }
+            return initialCardRows;
+        };
+
+        const BingoCell = (props) =>
+        <div className="grid-item">
+            <div className="grid-item-label">{props.number}</div>
+        </div>
+
+        const StarCell = () =>
+        <div className="grid-item">
+            <div className="grid-item-label star"></div>
+        </div>
+
+        const BingoCard = (props) => {
+            const card = props.cardData;
+            const cells = [];
+            for (var i = 0; i < 5; i++) {
+                for (var j = 0; j < 5; j++) {
+                    const number = card[j][i];
+                    if (i == 2 && j == 2) {
+                        cells.push(<StarCell key={`row-${i}-col-${j}`}/>);
+                    } else {
+                        cells.push(<BingoCell number={number} key={`row-${i}-col-${j}`}/>)
+                    }
+                }
+            }
+            return (
+                <div className="grid-container">
+                    { cells }
+                </div>
+            )
+        }
+
+        const cardData = genenateRandomBingoCard();
+
+        ReactDOM.render(
+            <BingoCard cardData={cardData} />,
+            document.getElementById('react_dom')
+        );
+    </script>
+    <page size="A4" layout="landscape">
+        <div id="react_dom" class='container root-container'></div>
+    </page>
+</html>
