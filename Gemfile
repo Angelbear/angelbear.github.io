@@ -16,7 +16,6 @@ gem "github-pages", "~> 228", group: :jekyll_plugins
 # If you have any plugins, put them here!
 group :jekyll_plugins do
   gem "jekyll-feed", "~> 0.12"
-  gem "github-pages", "~> 228"
   gem "jekyll-include-cache", "0.2.1"
   gem "jekyll-seo-tag", "~> 2.6"
 end
