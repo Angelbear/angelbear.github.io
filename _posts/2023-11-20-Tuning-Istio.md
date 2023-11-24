@@ -115,7 +115,7 @@ Although, I recommend you to adapt this setting per deployment because every dep
 ```yaml
 metadata:
     annotations:
-    proxy.istio.io/config: |
+      proxy.istio.io/config: |
         terminationDrainDuration: 30s
 ```
 
@@ -181,7 +181,7 @@ Why would this phantom connection happen? Why client Pod would connect to a Pod 
 
 ### xDS
 
-Let's pick some memories about how load balancing was done with / without Istio in [L4 Vs L7](./03-L4-Vs-L7.md). We can reuse the example of nginx, how does a client's Pod's istio-proxy choose a Pod to connect to when the client's main container needs to create a TCP connection to `nginx-service.namespace.svc.cluster.local`?
+Let's pick some memories about how load balancing was done with / without Istio in [L4 Vs L7](/istio/2023/11/20/L4-Vs-L7.html). We can reuse the example of nginx, how does a client's Pod's istio-proxy choose a Pod to connect to when the client's main container needs to create a TCP connection to `nginx-service.namespace.svc.cluster.local`?
 
 The answer is - service Pods need to register / deregister themselves, and client pods need to update the service Pods' registeration information. 
 
@@ -333,7 +333,7 @@ We can do a lot of efforts to reduce the xDS push time, however you could never 
 
 When we take a look at the logs and try to find out all the failed requests during a period, we found very interesting patterns - The failed requests were distributed among different client Pods, and each Pod failed for no more than 5 times. It seems that the client Pod will passively retry for other hosts if it experience a certain number of connection failures to a specific server Pod.
 
-This is yet another advanced traffic management feature that provided by Istio, which is not covered in [L4 Vs L7](./03-L4-Vs-L7.md), called **Outlier Detection**.
+This is yet another advanced traffic management feature that provided by Istio, which is not covered in [L4 Vs L7](/istio/2023/11/20/L4-Vs-L7.html), called **Outlier Detection**.
 
 xDS push will make the server Pods status to be eventually synced to the client Pods, and outlier detection is an addition support - before xDS push arrive, if the client Pod already experienced X times connection error to the destination Pod, it will mark it an "outlier" locally and avoid using it for a while.
 
@@ -376,7 +376,6 @@ Originally we've configured retries as following, to let it retry at most 3 time
 
 
 ```yaml
-# Source: houzz.c2-thrift.flip/templates/vs.yaml
 kind: VirtualService
 metadata:
   name: nginx-service-vs
