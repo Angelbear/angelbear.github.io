@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Random Calculations</title>
+    <title>小学一二年级数学题</title>
     <style>
         @page {
             size: A4;
@@ -29,8 +29,8 @@
         .calculation {
             padding: 5px;
             text-align: center;
-            font-size: 20px;
-            margin-bottom: 5px;
+            font-size: 18px;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -46,7 +46,7 @@
     </style>
 </head>
 <body>
-    <h1>Random Plus/Minus Calculations</h1>
+    <h1>小学一二年级数学题</h1>
     <div class="column-wrapper">
         <div class="column">
             <div class="calculations" id="calculations1"></div>
@@ -62,34 +62,79 @@
     </div>
 
     <script>
-        function getRandomNumber(max) {
-            return Math.floor(Math.random() * max) + 1;
+        function getRandomNumber(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
         }
 
-        function generateCalculation() {
-            var num1 = getRandomNumber(100);
-            var num2 = getRandomNumber(100);
-            const isPlus = Math.random() < 0.5;
-            const operator = isPlus ? '+' : '-';
-            if (!isPlus && num1 < num2) {
-                const tmp = num1;
-                num1 = num2;
-                num2 = tmp;
+        function generateTwoStepCalculation() {
+            // 生成三个数字，确保运算过程中不会出现负数
+            let num1, num2, num3;
+            let operator1, operator2;
+            let result;
+            
+            // 随机选择运算顺序：+ +, + -, - +, - -
+            const operationType = Math.floor(Math.random() * 4);
+            
+            switch(operationType) {
+                case 0: // + +
+                    num1 = getRandomNumber(1, 20);
+                    num2 = getRandomNumber(1, 20);
+                    num3 = getRandomNumber(1, 20);
+                    operator1 = '+';
+                    operator2 = '+';
+                    result = num1 + num2 + num3;
+                    break;
+                    
+                case 1: // + -
+                    num1 = getRandomNumber(1, 20);
+                    num2 = getRandomNumber(1, 20);
+                    // 确保 num1 + num2 > num3，避免负数
+                    num3 = getRandomNumber(1, Math.min(15, num1 + num2 - 1));
+                    operator1 = '+';
+                    operator2 = '-';
+                    result = num1 + num2 - num3;
+                    break;
+                    
+                case 2: // - +
+                    num1 = getRandomNumber(10, 30);
+                    num2 = getRandomNumber(1, Math.min(15, num1 - 1)); // 确保 num1 > num2
+                    num3 = getRandomNumber(1, 20);
+                    operator1 = '-';
+                    operator2 = '+';
+                    result = num1 - num2 + num3;
+                    break;
+                    
+                case 3: // - -
+                    num1 = getRandomNumber(15, 40);
+                    num2 = getRandomNumber(1, Math.min(15, num1 - 5)); // 确保 num1 > num2
+                    // 确保 num1 - num2 > num3，避免负数
+                    num3 = getRandomNumber(1, Math.min(15, num1 - num2 - 1));
+                    operator1 = '-';
+                    operator2 = '-';
+                    result = num1 - num2 - num3;
+                    break;
             }
-            const result = isPlus ? num1 + num2 : num1 - num2;
+            
+            // 确保最终结果在合理范围内（1-50）
+            if (result < 1 || result > 50) {
+                return generateTwoStepCalculation(); // 递归重新生成
+            }
 
-            const missingNumberType = Math.floor(Math.random() * 3); // 0, 1, or 2
+            const missingNumberType = Math.floor(Math.random() * 4); // 0, 1, 2, or 3
             let missingNumber;
 
             switch (missingNumberType) {
                 case 0: // Missing the first number
-                    missingNumber = `<div class="missing-number"></div> ${operator} ${num2} = ${result}`;
+                    missingNumber = `<div class="missing-number"></div> ${operator1} ${num2} ${operator2} ${num3} = ${result}`;
                     break;
                 case 1: // Missing the second number
-                    missingNumber = `${num1} ${operator} <div class="missing-number"></div> = ${result}`;
+                    missingNumber = `${num1} ${operator1} <div class="missing-number"></div> ${operator2} ${num3} = ${result}`;
                     break;
-                case 2: // Missing the result
-                    missingNumber = `${num1} ${operator} ${num2} = <div class="missing-number">`;
+                case 2: // Missing the third number
+                    missingNumber = `${num1} ${operator1} ${num2} ${operator2} <div class="missing-number"></div> = ${result}`;
+                    break;
+                case 3: // Missing the result
+                    missingNumber = `${num1} ${operator1} ${num2} ${operator2} ${num3} = <div class="missing-number">`;
                     break;
             }
 
@@ -101,7 +146,7 @@
             calculationsElement.innerHTML = '';
 
             for (let i = 0; i < numCalculations; i++) {
-                const calculation = generateCalculation();
+                const calculation = generateTwoStepCalculation();
                 const calculationDiv = document.createElement('div');
                 calculationDiv.className = 'calculation';
                 calculationDiv.innerHTML = calculation;
@@ -111,9 +156,9 @@
 
         // Generate random equations for each column on page load
         window.addEventListener('load', function() {
-            generateCalculations(1, 18); // 5 equations in column 1
-            generateCalculations(2, 18); // 5 equations in column 2
-            generateCalculations(3, 18); // 5 equations in column 3
+            generateCalculations(1, 15); // 15 equations in column 1
+            generateCalculations(2, 15); // 15 equations in column 2
+            generateCalculations(3, 15); // 15 equations in column 3
         });
     </script>
 </body>
