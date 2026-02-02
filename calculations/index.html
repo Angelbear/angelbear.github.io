@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小学一二年级数学题</title>
+    <title>二年级数学练习</title>
     <style>
         @page {
             size: A4;
@@ -46,7 +46,7 @@
     </style>
 </head>
 <body>
-    <h1>小学一二年级数学题</h1>
+    <h1>二年级数学练习（100以内加减 & 9×9乘除）</h1>
     <div class="column-wrapper">
         <div class="column">
             <div class="calculations" id="calculations1"></div>
@@ -66,79 +66,170 @@
             return Math.floor(Math.random() * (max - min + 1)) + min;
         }
 
-        function generateTwoStepCalculation() {
-            // 生成三个数字，确保运算过程中不会出现负数
-            let num1, num2, num3;
-            let operator1, operator2;
-            let result;
-            
-            // 随机选择运算顺序：+ +, + -, - +, - -
-            const operationType = Math.floor(Math.random() * 4);
-            
-            switch(operationType) {
-                case 0: // + +
-                    num1 = getRandomNumber(1, 20);
-                    num2 = getRandomNumber(1, 20);
-                    num3 = getRandomNumber(1, 20);
-                    operator1 = '+';
-                    operator2 = '+';
-                    result = num1 + num2 + num3;
-                    break;
-                    
-                case 1: // + -
-                    num1 = getRandomNumber(1, 20);
-                    num2 = getRandomNumber(1, 20);
-                    // 确保 num1 + num2 > num3，避免负数
-                    num3 = getRandomNumber(1, Math.min(15, num1 + num2 - 1));
-                    operator1 = '+';
-                    operator2 = '-';
-                    result = num1 + num2 - num3;
-                    break;
-                    
-                case 2: // - +
-                    num1 = getRandomNumber(10, 30);
-                    num2 = getRandomNumber(1, Math.min(15, num1 - 1)); // 确保 num1 > num2
-                    num3 = getRandomNumber(1, 20);
-                    operator1 = '-';
-                    operator2 = '+';
-                    result = num1 - num2 + num3;
-                    break;
-                    
-                case 3: // - -
-                    num1 = getRandomNumber(15, 40);
-                    num2 = getRandomNumber(1, Math.min(15, num1 - 5)); // 确保 num1 > num2
-                    // 确保 num1 - num2 > num3，避免负数
-                    num3 = getRandomNumber(1, Math.min(15, num1 - num2 - 1));
-                    operator1 = '-';
-                    operator2 = '-';
-                    result = num1 - num2 - num3;
-                    break;
+        function pickOne(items) {
+            return items[getRandomNumber(0, items.length - 1)];
+        }
+
+        function getRandomNumberExcluding(min, max, excludedValues, maxTries = 30) {
+            const excluded = new Set(excludedValues);
+            for (let i = 0; i < maxTries; i++) {
+                const n = getRandomNumber(min, max);
+                if (!excluded.has(n)) return n;
             }
-            
-            // 确保最终结果在合理范围内（1-50）
-            if (result < 1 || result > 50) {
-                return generateTwoStepCalculation(); // 递归重新生成
+            // Fallback: return min if it's not excluded; otherwise max.
+            if (!excluded.has(min)) return min;
+            return max;
+        }
+
+        // 二年级乘除：这里直接不出 ×1/÷1，因子限定 2..9
+        function getFactor2to9() {
+            return getRandomNumber(2, 9);
+        }
+
+        function box() {
+            return '<span class="missing-number"></span>';
+        }
+
+        function formatExpression(tokens, missingIndex) {
+            return tokens
+                .map((t, i) => (i === missingIndex ? box() : String(t)))
+                .join(' ');
+        }
+
+        // 100以内加减：a + b = c / a - b = c
+        function generateAddSubOneStep() {
+            const isAdd = Math.random() < 0.55;
+            let a, b, c, op;
+
+            if (isAdd) {
+                // 避免出现 "+ 0"：b 至少为 1，因此 a 最多到 99
+                a = getRandomNumber(1, 99);
+                b = getRandomNumber(1, 100 - a);
+                c = a + b;
+                op = '+';
+            } else {
+                // 避免出现 "- 0"：b 至少为 1
+                a = getRandomNumber(1, 100);
+                b = getRandomNumber(1, a);
+                c = a - b;
+                op = '-';
             }
 
-            const missingNumberType = Math.floor(Math.random() * 4); // 0, 1, 2, or 3
-            let missingNumber;
+            // 缺项：a / b / 结果
+            const missing = getRandomNumber(0, 2);
+            const tokens = [a, op, b, '=', c];
+            const missingIndex = missing === 0 ? 0 : missing === 1 ? 2 : 4;
+            return formatExpression(tokens, missingIndex);
+        }
 
-            switch (missingNumberType) {
-                case 0: // Missing the first number
-                    missingNumber = `<div class="missing-number"></div> ${operator1} ${num2} ${operator2} ${num3} = ${result}`;
-                    break;
-                case 1: // Missing the second number
-                    missingNumber = `${num1} ${operator1} <div class="missing-number"></div> ${operator2} ${num3} = ${result}`;
-                    break;
-                case 2: // Missing the third number
-                    missingNumber = `${num1} ${operator1} ${num2} ${operator2} <div class="missing-number"></div> = ${result}`;
-                    break;
-                case 3: // Missing the result
-                    missingNumber = `${num1} ${operator1} ${num2} ${operator2} ${num3} = <div class="missing-number">`;
-                    break;
+        // 9×9 乘法：a × b = c
+        function generateMultiply() {
+            const a = getFactor2to9();
+            const b = getFactor2to9();
+            const c = a * b;
+
+            const missing = getRandomNumber(0, 2);
+            const tokens = [a, '×', b, '=', c];
+            const missingIndex = missing === 0 ? 0 : missing === 1 ? 2 : 4;
+            return formatExpression(tokens, missingIndex);
+        }
+
+        // 9×9 除法（整除）：c ÷ b = a
+        function generateDivision() {
+            const a = getFactor2to9();
+            const b = getFactor2to9();
+            const c = a * b;
+
+            const missing = getRandomNumber(0, 2);
+            const tokens = [c, '÷', b, '=', a];
+            const missingIndex = missing === 0 ? 0 : missing === 1 ? 2 : 4;
+            return formatExpression(tokens, missingIndex);
+        }
+
+        // 连续算式（加减）：a ± b ± c = result，过程不为负且<=100
+        function generateAddSubChain() {
+            // 采用“生成-校验-重试”，避免出现 "+ 0" / "- 0" 以及越界。
+            for (let attempt = 0; attempt < 80; attempt++) {
+                const op1 = pickOne(['+', '-']);
+                const op2 = pickOne(['+', '-']);
+
+                // 为了避免 op1 为 '+' 时出现 b=0，限制 a<=99
+                const a = op1 === '+' ? getRandomNumber(10, 99) : getRandomNumber(10, 100);
+
+                let bMin = 1;
+                let bMax;
+                if (op1 === '+') {
+                    bMax = Math.min(50, 100 - a);
+                } else {
+                    // 避免第一步得到 0：b <= a-1
+                    bMax = Math.min(50, a - 1);
+                }
+                if (bMax < bMin) continue;
+                const b = getRandomNumber(bMin, bMax);
+
+                const first = op1 === '+' ? a + b : a - b;
+                if (first < 0 || first > 100) continue;
+
+                let cMin = 1;
+                let cMax;
+                if (op2 === '+') {
+                    cMax = Math.min(50, 100 - first);
+                } else {
+                    cMax = Math.min(50, first);
+                }
+                if (cMax < cMin) continue;
+                const c = getRandomNumber(cMin, cMax);
+
+                const result = op2 === '+' ? first + c : first - c;
+                if (result < 0 || result > 100) continue;
+
+                const missingSlot = getRandomNumber(0, 3);
+                const tokens = [a, op1, b, op2, c, '=', result];
+                const missingIndex = missingSlot === 0 ? 0 : missingSlot === 1 ? 2 : missingSlot === 2 ? 4 : 6;
+                return formatExpression(tokens, missingIndex);
             }
 
-            return missingNumber;
+            // 兜底：如果连续算式一直生成失败，就回退到单步题
+            return generateAddSubOneStep();
+        }
+
+        // 连续算式（乘除）：x × y ÷ z = r（整除，且中间数不超过 81）
+        function generateMulDivChain() {
+            // 尽量避免出现 ÷1 或 ×1（仍保留极少概率出现 1）。
+            const r = getFactor2to9();
+            const z = getFactor2to9();
+            const product = r * z; // <= 81
+
+            // 选择一个 y（1..9）作为 product 的因数，优先不选 1
+            const factors = [];
+            const preferredFactors = [];
+            for (let y = 1; y <= 9; y++) {
+                if (product % y === 0) {
+                    factors.push(y);
+                    // 避免 y=1（会变成 ×1），也尽量避免 y=product（会导致 x=1）
+                    if (y !== 1 && y !== product) preferredFactors.push(y);
+                }
+            }
+
+            const y = preferredFactors.length > 0 ? pickOne(preferredFactors) : pickOne(factors);
+            const x = product / y;
+
+            // 兜底：如果还是出现 x=1（例如 product<=9 且选到了 y=product），重试
+            if (x === 1) return generateMulDivChain();
+
+            const missingSlot = getRandomNumber(0, 3);
+            const tokens = [x, '×', y, '÷', z, '=', r];
+            const missingIndex = missingSlot === 0 ? 0 : missingSlot === 1 ? 2 : missingSlot === 2 ? 4 : 6;
+            return formatExpression(tokens, missingIndex);
+        }
+
+        function generateGrade2Calculation() {
+            // 比例：加减(单步) 45%，乘除 40%，连续算式 15%
+            const roll = Math.random();
+            if (roll < 0.45) return generateAddSubOneStep();
+            if (roll < 0.65) return generateMultiply();
+            if (roll < 0.85) return generateDivision();
+            return Math.random() < 0.7 ? generateAddSubChain() : generateMulDivChain();
         }
 
         function generateCalculations(columnNumber, numCalculations) {
@@ -146,7 +237,7 @@
             calculationsElement.innerHTML = '';
 
             for (let i = 0; i < numCalculations; i++) {
-                const calculation = generateTwoStepCalculation();
+                const calculation = generateGrade2Calculation();
                 const calculationDiv = document.createElement('div');
                 calculationDiv.className = 'calculation';
                 calculationDiv.innerHTML = calculation;
