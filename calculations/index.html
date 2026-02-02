@@ -195,32 +195,50 @@
 
         // 连续算式（乘除）：x × y ÷ z = r（整除，且中间数不超过 81）
         function generateMulDivChain() {
-            // 尽量避免出现 ÷1 或 ×1（仍保留极少概率出现 1）。
-            const r = getFactor2to9();
-            const z = getFactor2to9();
-            const product = r * z; // <= 81
+            // 避免出现“×N 然后又 ÷N”的冗余情况：确保 y !== z。
+            for (let attempt = 0; attempt < 80; attempt++) {
+                // 尽量避免出现 ÷1 或 ×1（仍保留极少概率出现 1）。
+                const r = getFactor2to9();
+                const z = getFactor2to9();
+                const product = r * z; // <= 81
 
-            // 选择一个 y（1..9）作为 product 的因数，优先不选 1
-            const factors = [];
-            const preferredFactors = [];
-            for (let y = 1; y <= 9; y++) {
-                if (product % y === 0) {
+                // 选择一个 y（1..9）作为 product 的因数，优先不选 1
+                const factors = [];
+                const preferredFactors = [];
+                const factorsNoCancel = [];
+                const preferredFactorsNoCancel = [];
+
+                for (let y = 1; y <= 9; y++) {
+                    if (product % y !== 0) continue;
                     factors.push(y);
+                    if (y !== z) factorsNoCancel.push(y);
+
                     // 避免 y=1（会变成 ×1），也尽量避免 y=product（会导致 x=1）
-                    if (y !== 1 && y !== product) preferredFactors.push(y);
+                    if (y !== 1 && y !== product) {
+                        preferredFactors.push(y);
+                        if (y !== z) preferredFactorsNoCancel.push(y);
+                    }
                 }
+
+                const candidate = preferredFactorsNoCancel.length > 0
+                    ? preferredFactorsNoCancel
+                    : (factorsNoCancel.length > 0 ? factorsNoCancel : null);
+                if (!candidate) continue;
+
+                const y = pickOne(candidate);
+                const x = product / y;
+
+                // 兜底：如果还是出现 x=1（例如 product<=9 且选到了 y=product），重试
+                if (x === 1) continue;
+
+                const missingSlot = getRandomNumber(0, 3);
+                const tokens = [x, '×', y, '÷', z, '=', r];
+                const missingIndex = missingSlot === 0 ? 0 : missingSlot === 1 ? 2 : missingSlot === 2 ? 4 : 6;
+                return formatExpression(tokens, missingIndex);
             }
 
-            const y = preferredFactors.length > 0 ? pickOne(preferredFactors) : pickOne(factors);
-            const x = product / y;
-
-            // 兜底：如果还是出现 x=1（例如 product<=9 且选到了 y=product），重试
-            if (x === 1) return generateMulDivChain();
-
-            const missingSlot = getRandomNumber(0, 3);
-            const tokens = [x, '×', y, '÷', z, '=', r];
-            const missingIndex = missingSlot === 0 ? 0 : missingSlot === 1 ? 2 : missingSlot === 2 ? 4 : 6;
-            return formatExpression(tokens, missingIndex);
+            // 兜底：如果连续乘除一直生成失败，就回退到单步题
+            return Math.random() < 0.5 ? generateMultiply() : generateDivision();
         }
 
         function generateGrade2Calculation() {
